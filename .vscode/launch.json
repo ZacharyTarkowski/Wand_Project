@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "configurations": [
+        {
+            "name": "STM32 Debug",
+            //"cwd": "C:/Users/zacht/Desktop/Files/Projects/STM32_tools/gcc-arm-none-eabi-10.3-2021.10/bin",
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceRoot}/build/Wand_Project.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            "servertype": "openocd",
+            "device": "STM32F401RE",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32f4x.cfg"
+            ],
+            "showDevDebugOutput": "raw"
+            
+        }
+    ],
+    
+}
