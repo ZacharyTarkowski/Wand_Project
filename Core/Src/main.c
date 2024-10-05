@@ -25,6 +25,8 @@
 #include "Ring_Buffer.h"
 #include "MPU_6050_Utils.h"
 
+#include "Dynamic_Time_Warping.h"
+
 
 
 Mpu_6050_handle_s MPU6050_handle;
@@ -52,6 +54,8 @@ u8 capture_flag = 0;
 I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim3;
+
+u32 capture_flag_valid_time;
 
 
 /* USER CODE BEGIN PV */
@@ -102,6 +106,8 @@ int main(void)
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
 	MX_USART2_UART_Init();
+
+	
 	MX_I2C1_Init();
 	MX_TIM3_Init();
 	/* USER CODE BEGIN 2 */
@@ -113,7 +119,15 @@ int main(void)
 	// 8000 / (x+1) = desired_sample_rate
 	u8 sample_rate_divider = 0xFF;//0x80;
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider );
+	// if(status != HAL_OK)
+	// {
+	// 	hi2c1.Instance->CR1 |= (1<<15);
+	// 	RCC->APB1RSTR |= (1<<22); 
+	// 	RCC->APB1RSTR &= ~(1<<22); 
+	// 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider );
+	// }
 	ring_buffer_init(RING_BUFFER_SIZE);
+	
 
 	u8 toggle = 0;
 	u8 first_run = 1;
@@ -122,6 +136,9 @@ int main(void)
 
 	u32 loopnum = 0;
 	capture_flag = 0;
+	u8 toggle_buf = 0;
+
+	u8 state = 0;
 
 	/* USER CODE END 2 */
 
@@ -133,39 +150,72 @@ int main(void)
 
 		/* USER CODE BEGIN 3 */
 
-		if(capture_flag)
+		switch(state)
 		{
-			if(first_run)
+			case 0:
+			case 1:
+
+			if(capture_flag)
 			{
-				uart_println("Capturing");
-				first_run = 0;
-			}
-			if(data_ready_flag)
-			{
-				toggle = 1;
-				data_ready_flag = 0;
-				//capture_flag = 0;
-//				//capture data
-//				//add to ring buffer
-				status = ring_buffer_MPU6050_read_and_store(pMPU6050);
-				if(status != HAL_OK)
+				if(first_run)
 				{
-					uart_println("Read and store failed %d",loopnum);
+					uart_println("Capturing %d",state);
+					first_run = 0;
+					status = MPU6050_reset_fifo_(pMPU6050);
+					if(status != HAL_OK)
+					{
+						uart_println("Failed to reset FIFO!");
+						hi2c1.Instance->CR1 |= (1<<15);
+					}
+					loopnum = 0;
 				}
+				if(data_ready_flag)
+				{
+					toggle = 1;
+					data_ready_flag = 0;
+					//capture_flag = 0;
+					//capture data
+					//add to ring buffer
+					status = ring_buffer_MPU6050_read_and_store(pMPU6050, state);
+					if(status != HAL_OK)
+					{
+						uart_println("Read and store failed %d",loopnum);
+						hi2c1.Instance->CR1 |= (1<<15);
+					}
 
-				loopnum++;
+					loopnum++;
+				}
 			}
+			else
+			{
+				if( !first_run )
+				{
+					uart_println("Done Capturing %d",state);
+					state++;
+					first_run = 1;
+				}
+			}
+			break;
+
+			case 2:
+				uart_println("Ring Buffer 1");
+				ring_buffer_print_to_write_index(0);
+				uart_println("Ring Buffer 2");
+				ring_buffer_print_to_write_index(1);
+
+				u32 x_accel_dtw = DTW_Distance(ring_buffer[0], ring_buffer[1]);
+				uart_println("X Accel DTW %d", x_accel_dtw);
+				
+
+
+				ring_buffer_clear(0);
+				ring_buffer_clear(1);
+				state = 0;
+
+
+			break;
 
 		}
-		else if (toggle)
-		{
-			toggle = 0;
-			first_run = 1;
-			ring_buffer_print_to_write_index();
-			ring_buffer_clear();
-			//ring_buffer_print_element(0);
-		}
-
 
 	}
 	/* USER CODE END 3 */
@@ -173,6 +223,8 @@ int main(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+	u32 capture_flag_current_time;
+
 	switch(GPIO_Pin)
 	{
 	case GPIO_PIN_9:
@@ -181,7 +233,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		break;
 	case GPIO_PIN_10:
 		//uart_println("Button Press Interrupt Triggered");
-		capture_flag = !capture_flag;
+		capture_flag_current_time = HAL_GetTick();
+		if(capture_flag_current_time > capture_flag_valid_time)
+		{
+			capture_flag = !capture_flag;
+			capture_flag_valid_time = capture_flag_valid_time = capture_flag_current_time + 250;
+		}
 		break;
 	default:
 		//uart_println("Unhandled interrupt triggered %d",GPIO_Pin);

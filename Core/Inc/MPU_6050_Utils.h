@@ -92,7 +92,7 @@
 
 #define MPU6050_FIFO_SIZE 1024
 
-#define MPU6050_TIMEOUT HAL_MAX_DELAY-1 //-1 for not infinite timeout in i2c
+#define MPU6050_TIMEOUT 50//HAL_MAX_DELAY-1 //-1 for not infinite timeout in i2c
 
 #define MPU6050_SIZE_SAMPLE_BUFFER 100
 
@@ -112,6 +112,8 @@
 #define MPU_6050_YG_EN    1
 #define MPU_6050_ZG_EN    1
 #define MPU_6050_ACCEL_EN 1
+
+#define MPU_6050_NUM_DIMS MPU_6050_TEMP_EN + MPU_6050_XG_EN + MPU_6050_YG_EN + MPU_6050_ZG_EN + (MPU_6050_ACCEL_EN * 3 )
 
 #define MPU6050_PRINT_CSV 1
 #define MPU6050_PRINT_LABELLED 0
@@ -200,6 +202,8 @@ void MPU6050_print_data(Mpu_6050_data_s* pData);
 
 void MPU6050_read_fifo_data(u32 index, Mpu_6050_data_s* data);
 HAL_StatusTypeDef MPU6050_get_fifo_data(Mpu_6050_handle_s* handle, u8* num_samples);
+
+HAL_StatusTypeDef MPU6050_reset_fifo_(Mpu_6050_handle_s* handle);
 
 
 #endif /* SRC_MPU6050EROMETER_UTILS_H_ */
