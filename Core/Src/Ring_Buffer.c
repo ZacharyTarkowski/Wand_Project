@@ -13,6 +13,7 @@ void ring_buffer_init(u32 size)
 {
 	ring_buffer_print_function = &MPU6050_print_data;
 
+	//fixme numringbuffers
 	for(int i = 0; i< 2; i++)
 	{
 		ring_buffer[i] =  malloc(size * sizeof(buffer_element));

@@ -75,6 +75,13 @@ static void MX_TIM3_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+typedef enum  {
+	CAPTURE_1,
+	CAPTURE_2,
+	PRINT_AND_COMPARE,
+	HARD_RESET
+}WAND_STATE;
+
 /* USER CODE END 0 */
 
 /**
@@ -119,13 +126,15 @@ int main(void)
 	// 8000 / (x+1) = desired_sample_rate
 	u8 sample_rate_divider = 0xFF;//0x80;
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider );
-	// if(status != HAL_OK)
-	// {
-	// 	hi2c1.Instance->CR1 |= (1<<15);
-	// 	RCC->APB1RSTR |= (1<<22); 
-	// 	RCC->APB1RSTR &= ~(1<<22); 
-	// 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider );
-	// }
+	if(status != HAL_OK)
+	{
+		// hi2c1.Instance->CR1 |= (1<<15);
+		// RCC->APB1RSTR |= (1<<22); 
+		// RCC->APB1RSTR &= ~(1<<22); 
+
+		//MODIFY_REG(hi2c->Instance->CR1, (I2C_CR1_ENGC | I2C_CR1_NOSTRETCH), (hi2c->Init.GeneralCallMode | hi2c->Init.NoStretchMode));
+		//status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider );
+	}
 	ring_buffer_init(RING_BUFFER_SIZE);
 	
 
@@ -138,7 +147,8 @@ int main(void)
 	capture_flag = 0;
 	u8 toggle_buf = 0;
 
-	u8 state = 0;
+	WAND_STATE state = CAPTURE_1;
+	u8 MPU6050_hard_reset_flag;
 
 	/* USER CODE END 2 */
 
@@ -152,8 +162,8 @@ int main(void)
 
 		switch(state)
 		{
-			case 0:
-			case 1:
+			case CAPTURE_1:
+			case CAPTURE_2:
 
 			if(capture_flag)
 			{
@@ -162,14 +172,17 @@ int main(void)
 					uart_println("Capturing %d",state);
 					first_run = 0;
 					status = MPU6050_reset_fifo_(pMPU6050);
+					//delay needed, otherwise fifo read fails because it got reset
+					HAL_Delay(500);
 					if(status != HAL_OK)
 					{
 						uart_println("Failed to reset FIFO!");
-						hi2c1.Instance->CR1 |= (1<<15);
+						MPU6050_hard_reset_flag = 1;
 					}
 					loopnum = 0;
 				}
-				if(data_ready_flag)
+
+				if(data_ready_flag && !MPU6050_hard_reset_flag)
 				{
 					toggle = 1;
 					data_ready_flag = 0;
@@ -180,8 +193,15 @@ int main(void)
 					if(status != HAL_OK)
 					{
 						uart_println("Read and store failed %d",loopnum);
-						hi2c1.Instance->CR1 |= (1<<15);
+						MPU6050_hard_reset_flag = 1;
+						
 					}
+
+				if(MPU6050_hard_reset_flag)
+				{
+					state = HARD_RESET;
+				}
+
 
 					loopnum++;
 				}
@@ -197,14 +217,14 @@ int main(void)
 			}
 			break;
 
-			case 2:
+			case PRINT_AND_COMPARE:
 				uart_println("Ring Buffer 1");
 				ring_buffer_print_to_write_index(0);
 				uart_println("Ring Buffer 2");
 				ring_buffer_print_to_write_index(1);
 
-				u32 x_accel_dtw = DTW_Distance(ring_buffer[0], ring_buffer[1]);
-				uart_println("X Accel DTW %d", x_accel_dtw);
+				DTW_Result result = DTW_Distance(ring_buffer[0], ring_buffer[1]);
+				print_dtw_result(&result);
 				
 
 
@@ -213,6 +233,23 @@ int main(void)
 				state = 0;
 
 
+			break;
+
+			case HARD_RESET:
+				//hard reset
+				MPU6050_hard_reset_flag = 0;
+
+				uart_println("MPU6050 Hard Reset Needed");
+
+				//debug
+				while(1)
+				{
+
+				}
+			break;
+
+			default:
+				uart_println("UNKNOWN STATE");
 			break;
 
 		}
@@ -237,7 +274,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		if(capture_flag_current_time > capture_flag_valid_time)
 		{
 			capture_flag = !capture_flag;
-			capture_flag_valid_time = capture_flag_valid_time = capture_flag_current_time + 250;
+			capture_flag_valid_time = capture_flag_current_time + 250;
 		}
 		break;
 	default:

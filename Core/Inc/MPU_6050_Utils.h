@@ -92,7 +92,7 @@
 
 #define MPU6050_FIFO_SIZE 1024
 
-#define MPU6050_TIMEOUT 50//HAL_MAX_DELAY-1 //-1 for not infinite timeout in i2c
+#define MPU6050_TIMEOUT 20//HAL_MAX_DELAY-1 //-1 for not infinite timeout in i2c
 
 #define MPU6050_SIZE_SAMPLE_BUFFER 100
 
@@ -137,25 +137,25 @@ typedef struct reg
 typedef struct Mpu_6050_data_s
 {
 #if MPU_6050_ACCEL_EN
-	u16 x_accel_data;
-	u16 y_accel_data;
-	u16 z_accel_data;
+	s16 x_accel_data;
+	s16 y_accel_data;
+	s16 z_accel_data;
 #endif
 
 #if MPU_6050_XG_EN
-	u16 x_gyro_data;
+	s16 x_gyro_data;
 #endif
 
 #if MPU_6050_YG_EN
-	u16 y_gyro_data;
+	s16 y_gyro_data;
 #endif
 
 #if MPU_6050_ZG_EN
-	u16 z_gyro_data;
+	s16 z_gyro_data;
 #endif
 
 #if MPU_6050_TEMP_EN
-	u16 temp_data;
+	s16 temp_data;
 #endif
 }Mpu_6050_data_s;
 
