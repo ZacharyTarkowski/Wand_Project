@@ -2,6 +2,7 @@
 #define H_DYNAMIC_TIME_WARPING
 
 #include "Ring_Buffer.h"
+#include <stdlib.h>
 
 #define MIN(a,b) ((a) < (b)  ? (a) : (b) )
 
@@ -21,13 +22,6 @@ typedef struct DTW_Result
     s32 z_gyro_result;
 } DTW_Result;
 
-#define X_ACCEL_IDX 0
-#define Y_ACCEL_IDX 1
-#define Z_ACCEL_IDX 2
-#define X_GYRO_IDX  3
-#define Y_GYRO_IDX  4
-#define Z_GYRO_IDX  5
-
 typedef struct dtw_array_data
 {
     u32 x_accel_value;
@@ -41,7 +35,7 @@ typedef struct dtw_array_data
 } dtw_array_data;
 
 
-DTW_Result DTW_Distance( buffer_element* s, buffer_element* t);
+DTW_Result DTW_Distance( buffer_element* s, buffer_element* t, u32 s_length, u32 t_length);
 
 
 

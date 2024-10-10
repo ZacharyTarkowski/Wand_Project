@@ -6,6 +6,7 @@
         "general_utils.h": "c",
         "mpu_6050_utils.h": "c",
         "dynamic_time_warping.h": "c",
-        "stm32f4xx_hal.h": "c"
+        "stm32f4xx_hal.h": "c",
+        "stdlib.h": "c"
     }
 }

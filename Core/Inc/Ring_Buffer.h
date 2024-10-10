@@ -14,8 +14,8 @@
 #include "MPU_6050_Utils.h"
 
 //put this in a user config
-#define RING_BUFFER_SIZE 1024
-#define MAX_RING_BUFFERS (1024*1024*20)
+#define RING_BUFFER_SIZE 128
+
 //#define RING_BUFFER_ERROR_TYPE HAL_StatusTypeDef
 #define buffer_element Mpu_6050_data_s
 

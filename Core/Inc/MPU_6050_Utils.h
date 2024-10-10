@@ -169,6 +169,18 @@ typedef struct MPU6050_accelerometer_handle
 }Mpu_6050_handle_s;
 
 
+//fixme rename a majority of these lol
+typedef enum 
+{
+    X_ACCEL_IDX = 0, 
+    Y_ACCEL_IDX = 1,
+    Z_ACCEL_IDX = 2,
+    X_GYRO_IDX  = 3,
+    Y_GYRO_IDX  = 4,
+    Z_GYRO_IDX  = 5
+}MPU6050_dimension;
+
+
 
 #if MPU6050_PRINT_CSV
 
@@ -191,7 +203,7 @@ typedef struct MPU6050_accelerometer_handle
 HAL_StatusTypeDef MPU6050_read_reg(Mpu_6050_handle_s* handle, u8 address, u8* pData);
 HAL_StatusTypeDef MPU6050_write_reg(Mpu_6050_handle_s* handle, u8 address, u8 data);
 
-HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider);
+HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider, u8 int_config, u8 user_config, u8 dlpf_config);
 
 HAL_StatusTypeDef MPU6050_get_raw_data(Mpu_6050_handle_s* handle, u8* buf);
 

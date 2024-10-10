@@ -124,8 +124,8 @@ int main(void)
 
 	//should make a function to calc this automagically
 	// 8000 / (x+1) = desired_sample_rate
-	u8 sample_rate_divider = 0xFF;//0x80;
-	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider );
+	u8 sample_rate_divider = 0xFF;//0x14;//0x80;
+	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
 	if(status != HAL_OK)
 	{
 		// hi2c1.Instance->CR1 |= (1<<15);
@@ -223,7 +223,7 @@ int main(void)
 				uart_println("Ring Buffer 2");
 				ring_buffer_print_to_write_index(1);
 
-				DTW_Result result = DTW_Distance(ring_buffer[0], ring_buffer[1]);
+				DTW_Result result = DTW_Distance(ring_buffer[0], ring_buffer[1],write_index[0],write_index[1]);
 				print_dtw_result(&result);
 				
 

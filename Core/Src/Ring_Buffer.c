@@ -116,3 +116,5 @@ void ring_buffer_destroy()
 {
 	free(ring_buffer);
 }
+
+

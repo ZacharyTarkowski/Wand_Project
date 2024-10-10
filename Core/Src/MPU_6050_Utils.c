@@ -199,7 +199,7 @@ u8 MPU6050_calculate_fifo_read_size(u8 fifo_config)
 	return size;
 }
 
-HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider)
+HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider, u8 int_config, u8 user_config, u8 dlpf_config)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 
@@ -253,18 +253,21 @@ HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c
 
 		//set int config
 		//todo make inconfig several values / masks
-		u8 int_config = 0x30;
+
+		
+		//u8 int_config = 0x30;
 		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_INT_PIN_CFG, int_config);
 
-		u8 user_config = 0x40;
+		//u8 user_config = 0x40;
 		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_USER_CTRL, user_config);
 
-		u8 dlpf_config = 0x02;
+		//u8 dlpf_config = 0x06;
 		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_CONFIG, dlpf_config);
 
 		u8 fifo_config = MPU_6050_FIFO_CONFIG_USER_DEFINED;
 		handle->fifo_config = fifo_config;
 		g_fifo_num_samples = MPU6050_FIFO_SIZE / sizeof(Mpu_6050_data_s);
+
 		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_FIFO_EN, fifo_config);
 	}
 
