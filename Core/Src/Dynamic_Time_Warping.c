@@ -197,8 +197,8 @@ void print_dtw_result(DTW_Result* data)
     uart_println("X ACCEL DTW %d", data->x_accel_result);
     uart_println("Y ACCEL DTW %d", data->y_accel_result);
     uart_println("Z ACCEL DTW %d", data->z_accel_result);
-    uart_println("X GYRO DTW %d", data->x_gyro_result);
-    uart_println("Y GYRO DTW %d", data->y_gyro_result);
-    uart_println("Z GYRO DTW %d", data->z_gyro_result);
+    uart_println("X GYRO DTW %d",  data->x_gyro_result );
+    uart_println("Y GYRO DTW %d",  data->y_gyro_result );
+    uart_println("Z GYRO DTW %d",  data->z_gyro_result );
 }
 

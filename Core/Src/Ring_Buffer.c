@@ -17,6 +17,7 @@ RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, u32 size)
 	
 	if(pRingBuffer->buffer == 0)
 	{
+		uart_println("Failed ring buffer init!");
 		status = RING_BUFFER_FAIL;
 	}
 	else
@@ -29,6 +30,7 @@ RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, u32 size)
 	return status;
 }
 
+//fixme probably need this out of ring buffer
 RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;

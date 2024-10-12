@@ -156,6 +156,10 @@ int main(void)
 	// 8000 / (x+1) = desired_sample_rate
 	u8 sample_rate_divider = 0x80;//0x14;//0x80;
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
+	
+	status |= ring_buffer_init(&ring_buffer_1, RING_BUFFER_MAX_SIZE);
+	status |= ring_buffer_init(&ring_buffer_2, RING_BUFFER_MAX_SIZE);
+
 	if(status != HAL_OK)
 	{
 		// hi2c1.Instance->CR1 |= (1<<15);
@@ -164,11 +168,8 @@ int main(void)
 
 		//MODIFY_REG(hi2c->Instance->CR1, (I2C_CR1_ENGC | I2C_CR1_NOSTRETCH), (hi2c->Init.GeneralCallMode | hi2c->Init.NoStretchMode));
 		//status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider );
+		return -1;
 	}
-	
-	
-	ring_buffer_init(&ring_buffer_1, RING_BUFFER_MAX_SIZE);
-	ring_buffer_init(&ring_buffer_2, RING_BUFFER_MAX_SIZE);
 	
 
 	if(dtw_init(SINGLE_MODE) != HAL_OK)
@@ -271,6 +272,17 @@ int main(void)
 				average_dtw = (result.x_accel_result + result.y_accel_result + result.z_accel_result + result.x_gyro_result + result.y_gyro_result + result.z_gyro_result ) / ( MPU_6050_NUM_DIMS );
 				uart_println("Avg DTW %d",average_dtw);
 
+				//normalization?
+				// result.x_accel_result = result.x_accel_result / average_dtw;
+				// result.y_accel_result = result.y_accel_result / average_dtw;
+				// result.z_accel_result = result.z_accel_result / average_dtw;
+				// result.x_gyro_result  = result.x_gyro_result  / average_dtw;
+				// result.y_gyro_result  = result.y_gyro_result  / average_dtw;
+				// result.z_gyro_result  = result.z_gyro_result  / average_dtw;
+				
+				// uart_println("Normalized DTW Maybe");
+				// print_dtw_result(&result);
+
 				if( result.x_accel_result < 12500 && result.y_accel_result < 12500 && result.z_accel_result < 12500 )
 				{
 					set_led_color(LED_COLOR_GREEN);
@@ -283,7 +295,7 @@ int main(void)
 
 
 				ring_buffer_clear(&ring_buffer_1);
-				ring_buffer_clear(&ring_buffer_1);
+				ring_buffer_clear(&ring_buffer_2);
 				state = 0;
 
 
