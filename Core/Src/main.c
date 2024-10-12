@@ -34,6 +34,11 @@ Mpu_6050_handle_s* pMPU6050 = &MPU6050_handle;
 u8 data_ready_flag = 0;
 u8 capture_flag = 0;
 u32 capture_flag_valid_time;
+
+ring_buffer_s ring_buffer_1;
+ring_buffer_s ring_buffer_2;
+
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -160,7 +165,10 @@ int main(void)
 		//MODIFY_REG(hi2c->Instance->CR1, (I2C_CR1_ENGC | I2C_CR1_NOSTRETCH), (hi2c->Init.GeneralCallMode | hi2c->Init.NoStretchMode));
 		//status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider );
 	}
-	ring_buffer_init(RING_BUFFER_SIZE);
+	
+	
+	ring_buffer_init(&ring_buffer_1, RING_BUFFER_MAX_SIZE);
+	ring_buffer_init(&ring_buffer_2, RING_BUFFER_MAX_SIZE);
 	
 
 	if(dtw_init(SINGLE_MODE) != HAL_OK)
@@ -222,7 +230,7 @@ int main(void)
 					//capture_flag = 0;
 					//capture data
 					//add to ring buffer
-					status = ring_buffer_MPU6050_read_and_store(pMPU6050, state);
+					status = ring_buffer_MPU6050_read_and_store(pMPU6050, ( state==CAPTURE_1 ? &ring_buffer_1 : &ring_buffer_2 ) );
 					if(status != HAL_OK)
 					{
 						uart_println("Read and store failed %d",loopnum);
@@ -252,11 +260,11 @@ int main(void)
 
 			case PRINT_AND_COMPARE:
 				uart_println("Ring Buffer 1");
-				ring_buffer_print_to_write_index(0);
+				ring_buffer_print_to_write_index(&ring_buffer_1);
 				uart_println("Ring Buffer 2");
-				ring_buffer_print_to_write_index(1);
+				ring_buffer_print_to_write_index(&ring_buffer_2);
 
-				DTW_Result result = DTW_Distance(ring_buffer[0], ring_buffer[1],write_index[0],write_index[1]);
+				DTW_Result result = DTW_Distance(ring_buffer_1.buffer, ring_buffer_2.buffer,ring_buffer_1.write_index,ring_buffer_2.write_index);
 				print_dtw_result(&result);
 
 				u32 average_dtw = 0;
@@ -274,8 +282,8 @@ int main(void)
 				
 
 
-				ring_buffer_clear(0);
-				ring_buffer_clear(1);
+				ring_buffer_clear(&ring_buffer_1);
+				ring_buffer_clear(&ring_buffer_1);
 				state = 0;
 
 

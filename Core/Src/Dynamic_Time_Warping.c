@@ -9,18 +9,18 @@ HAL_StatusTypeDef dtw_init(DTW_MODE mode)
 
     if(mode == SINGLE_MODE)
     {
-        single_dtw_buf = malloc(RING_BUFFER_SIZE * sizeof(u32*));
+        single_dtw_buf = malloc(RING_BUFFER_MAX_SIZE * sizeof(u32*));
 
         if(single_dtw_buf == 0)
         {
             status = HAL_ERROR;
         }
 
-        for(u32 i = 0; i< RING_BUFFER_SIZE; i++)
+        for(u32 i = 0; i< RING_BUFFER_MAX_SIZE; i++)
         {
             if(status == HAL_OK)
             {
-                single_dtw_buf[i] = malloc(RING_BUFFER_SIZE * sizeof(u32));
+                single_dtw_buf[i] = malloc(RING_BUFFER_MAX_SIZE * sizeof(u32));
 
                 if(single_dtw_buf[i] == 0)
                 {
@@ -43,18 +43,18 @@ HAL_StatusTypeDef dtw_init(DTW_MODE mode)
         {
             if(status == HAL_OK)
             {
-                multi_dtw_buf[i] = malloc(RING_BUFFER_SIZE * sizeof(u32*));
+                multi_dtw_buf[i] = malloc(RING_BUFFER_MAX_SIZE * sizeof(u32*));
 
                 if(multi_dtw_buf[i] == 0)
                 {
                     status = HAL_ERROR;
                 }
 
-                for(u32 j = 0; j< RING_BUFFER_SIZE; j++)
+                for(u32 j = 0; j< RING_BUFFER_MAX_SIZE; j++)
                 {
                     if(status == HAL_OK)
                     {
-                        multi_dtw_buf[i][j] = malloc(RING_BUFFER_SIZE * sizeof(u32));
+                        multi_dtw_buf[i][j] = malloc(RING_BUFFER_MAX_SIZE * sizeof(u32));
 
                         if(multi_dtw_buf[i][j] == 0)
                         {
@@ -72,7 +72,7 @@ HAL_StatusTypeDef dtw_init(DTW_MODE mode)
     
     if(status != HAL_OK)
     {
-        u32 requested_bytes = (mode == MULTI_MODE ? MPU_6050_NUM_DIMS : 1 ) * RING_BUFFER_SIZE * RING_BUFFER_SIZE; 
+        u32 requested_bytes = (mode == MULTI_MODE ? MPU_6050_NUM_DIMS : 1 ) * RING_BUFFER_MAX_SIZE * RING_BUFFER_MAX_SIZE; 
         uart_println("Problem with DTW Init, attempting to allocate %d bytes for mode %s", requested_bytes, mode == MULTI_MODE ? "MULTI" : "SINGLE");
     }
 
@@ -83,7 +83,7 @@ void free_dtw_buf(DTW_MODE mode)
 {
     if(mode == SINGLE_MODE)
     {
-        for(u32 i = 0; i< RING_BUFFER_SIZE; i++)
+        for(u32 i = 0; i< RING_BUFFER_MAX_SIZE; i++)
         {
             free(single_dtw_buf[i]);
         }
@@ -92,9 +92,9 @@ void free_dtw_buf(DTW_MODE mode)
     }
     else if(mode == MULTI_MODE)
     {
-        for(u32 i = 0; i< RING_BUFFER_SIZE; i++)
+        for(u32 i = 0; i< RING_BUFFER_MAX_SIZE; i++)
         {
-            for(u32 j = 0; j< RING_BUFFER_SIZE; j++)
+            for(u32 j = 0; j< RING_BUFFER_MAX_SIZE; j++)
             {
                 free(multi_dtw_buf[i][j]);
             }
@@ -145,7 +145,7 @@ u32 ring_buffer_dimension_sel(buffer_element *data, MPU6050_dimension sel)
 
 // void clear_dtw_buffer()
 // {
-//     memset(dtw_buf, 0x0, RING_BUFFER_SIZE * RING_BUFFER_SIZE * sizeof(u32));
+//     memset(dtw_buf, 0x0, RING_BUFFER_MAX_SIZE * RING_BUFFER_MAX_SIZE * sizeof(u32));
 // }
 
 u32 dtw_single(buffer_element *s, buffer_element *t, u32 n, u32 m, MPU6050_dimension sel) {

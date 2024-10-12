@@ -14,7 +14,7 @@
 #include "MPU_6050_Utils.h"
 
 //put this in a user config
-#define RING_BUFFER_SIZE 128
+#define RING_BUFFER_MAX_SIZE 128
 
 //#define RING_BUFFER_ERROR_TYPE HAL_StatusTypeDef
 #define buffer_element Mpu_6050_data_s
@@ -41,14 +41,16 @@ typedef enum
 
 typedef struct ring_buffer_s
 {
-    buffer_element* ring_buffer;
-    u32* write_ptr;
+    buffer_element* buffer;
+    u32 write_index;
+    u32 size;
+    void (*print_function)(buffer_element* pData);
 } ring_buffer_s;
 
-extern u32 write_index[2];
-//static buffer_element ring_buffer[RING_BUFFER_SIZE];
+//extern u32 write_index[2];
+//static buffer_element ring_buffer[RING_BUFFER_MAX_SIZE];
 
-extern buffer_element* ring_buffer[2];
+//extern buffer_element* ring_buffer[2];
 
 
 // #define print_function void (*print_function)(buffer_element*) ;
@@ -56,21 +58,22 @@ extern buffer_element* ring_buffer[2];
 static void (*ring_buffer_print_function)(buffer_element* pData);
 
 
-RING_BUFFER_ERROR_TYPE ring_buffer_init(u32 size);
+RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, u32 size);
 
-RING_BUFFER_ERROR_TYPE ring_buffer_write_element(buffer_element* data, u8 buf_sel);
-RING_BUFFER_ERROR_TYPE ring_buffer_read_element(u32 index, buffer_element* data, u8 buf_sel);
+RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buffer_element* data);
+RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 index, buffer_element* data);
 
-void ring_buffer_print_all_elements(u8 buf_sel);
-void ring_buffer_print_to_write_index(u8 buf_sel);
-void ring_buffer_print_element(u32 index,u8 buf_sel);
+void ring_buffer_print_all_elements(ring_buffer_s* pRingBuffer);
+void ring_buffer_print_to_write_index(ring_buffer_s* pRingBuffer);
+void ring_buffer_print_element(ring_buffer_s* pRingBuffer, u32 index);
 
-void ring_buffer_clear(u8 buf_sel);
-RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, u8 buf_sel);
+void ring_buffer_clear(ring_buffer_s* pRingBuffer);
 
-u32 ring_buffer_get_index();
+//todo fix this?
+RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer);
 
-void ring_buffer_destroy();
+void ring_buffer_clear(ring_buffer_s* pRingBuffer);
+void ring_buffer_destroy(ring_buffer_s* pRingBuffer);
 
 
 

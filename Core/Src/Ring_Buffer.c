@@ -6,29 +6,30 @@
  */
 #include "Ring_Buffer.h"
 
-buffer_element* ring_buffer[2];
-u32 write_index[2];
+//buffer_element* ring_buffer[2];
+//u32 write_index[2];
 
-RING_BUFFER_ERROR_TYPE ring_buffer_init(u32 size)
+RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, u32 size)
 {
 	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_SUCCESS;
 
-	ring_buffer_print_function = &MPU6050_print_data;
-
-	//fixme numringbuffers
-	for(int i = 0; i< 2; i++)
+	pRingBuffer->buffer = malloc(size * sizeof(buffer_element));
+	
+	if(pRingBuffer->buffer == 0)
 	{
-		ring_buffer[i] =  malloc(size * sizeof(buffer_element));
-		if(ring_buffer[i] == 0)
-		{
-			status = RING_BUFFER_FAIL;
-		}
+		status = RING_BUFFER_FAIL;
+	}
+	else
+	{
+		pRingBuffer->print_function = &MPU6050_print_data;
+		pRingBuffer->size = size;
+		pRingBuffer->write_index = 0;
 	}
 
 	return status;
 }
 
-RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, u8 buf_sel)
+RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 	u8 num_samples = 0;
@@ -43,7 +44,7 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* han
 		{
 			memset(&tmp_data,0,sizeof(Mpu_6050_data_s));
 			MPU6050_read_fifo_data(i, &tmp_data);
-			ring_buffer_write_element(&tmp_data, buf_sel);
+			ring_buffer_write_element(pRingBuffer, &tmp_data);
 		}
 	}
 
@@ -51,78 +52,84 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* han
 	return status;
 }
 
-RING_BUFFER_ERROR_TYPE ring_buffer_write_element(buffer_element* data, u8 buf_sel)
+RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buffer_element* data)
 {
+	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
+	
 	if(data !=0)
 	{
-		memcpy(&ring_buffer[buf_sel][write_index[buf_sel]++], data, sizeof(buffer_element));
+		memcpy(&pRingBuffer->buffer[pRingBuffer->write_index++], data, sizeof(buffer_element));
 
-		if(write_index[buf_sel] >= RING_BUFFER_SIZE)
+		if(pRingBuffer->write_index >= pRingBuffer->size)
 		{
-			write_index[buf_sel] = 0;
+			pRingBuffer->write_index = 0;
 			uart_println("ring buffer rollover");
 		}
 
-		return RING_BUFFER_SUCCESS;
+		status =  RING_BUFFER_SUCCESS;
 	}
 	else
 	{
-		return RING_BUFFER_FAIL;
+		status =  RING_BUFFER_FAIL;
 	}
+
+	return status;
 }
 
-RING_BUFFER_ERROR_TYPE ring_buffer_read_element(u32 index, buffer_element* data, u8 buf_sel)
+RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 index, buffer_element* data)
 {
-	*data = ring_buffer[buf_sel][index];
+	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
 
-	//return 0;
+	if(index < pRingBuffer->size)
+	{
+		*data = pRingBuffer->buffer[index];
+		status = RING_BUFFER_SUCCESS;
+	}
+
+	return status;
 }
 
-void ring_buffer_print_all_elements(u8 buf_sel)
+void ring_buffer_print_all_elements(ring_buffer_s* pRingBuffer)
 {
-	for(int i = 0; i< RING_BUFFER_SIZE; i++)
+	for(int i = 0; i< pRingBuffer->size; i++)
 	{
 		//fixme
 		buffer_element data;
-		ring_buffer_read_element(i, &data,buf_sel);
-		ring_buffer_print_function(&data);
+		ring_buffer_read_element(pRingBuffer, i, &data);
+		pRingBuffer->print_function(&data);
 	}
 }
 
-void ring_buffer_print_to_write_index(u8 buf_sel)
+void ring_buffer_print_to_write_index(ring_buffer_s* pRingBuffer)
 {
-	for(int i = 0; i< write_index[buf_sel]; i++)
+	for(int i = 0; i< pRingBuffer->write_index; i++)
 	{
 		//fixme
 		buffer_element data;
-		ring_buffer_read_element(i, &data,buf_sel);
-		ring_buffer_print_function(&data);
+		ring_buffer_read_element(pRingBuffer, i, &data);
+		pRingBuffer->print_function(&data);
 	}
 }
 
-void ring_buffer_print_element(u32 index,u8 buf_sel)
+void ring_buffer_print_element(ring_buffer_s* pRingBuffer, u32 index)
 {
-	buffer_element data;
-	ring_buffer_read_element(index, &data,buf_sel);
-	ring_buffer_print_function(&data);
+	if(index < pRingBuffer->size)
+	{
+		buffer_element data;
+		ring_buffer_read_element(pRingBuffer, index, &data);
+		pRingBuffer->print_function(&data);
+	}
 }
 
-//prospective print function given by a function pointer init
-//RING_BUFFER_ERROR_TYPE ring_buffer_set_print_function(size_t* fp_buffer_element_print)
-//{
-//	g_ring_buffer_print_function = fp_buffer_element_print;
-//}
-
-
-void ring_buffer_clear(u8 buf_sel)
+void ring_buffer_clear(ring_buffer_s* pRingBuffer)
 {
-	memset(ring_buffer[buf_sel],0x0,sizeof(ring_buffer));
-	write_index[buf_sel] = 0;
+	memset(pRingBuffer->buffer,0x0,pRingBuffer->size * sizeof(buffer_element));
+	pRingBuffer->write_index = 0;
 }
 
-void ring_buffer_destroy()
+void ring_buffer_destroy(ring_buffer_s* pRingBuffer)
 {
-	free(ring_buffer);
+	free(pRingBuffer->buffer);
 }
 
 
