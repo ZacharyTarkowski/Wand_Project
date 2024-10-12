@@ -1,6 +1,111 @@
 #include "Dynamic_Time_Warping.h"
 
-u32 dtw_buf[RING_BUFFER_SIZE][RING_BUFFER_SIZE];
+u32** single_dtw_buf;
+u32*** multi_dtw_buf;
+
+HAL_StatusTypeDef dtw_init(DTW_MODE mode)
+{
+    HAL_StatusTypeDef status = HAL_OK;
+
+    if(mode == SINGLE_MODE)
+    {
+        single_dtw_buf = malloc(RING_BUFFER_SIZE * sizeof(u32*));
+
+        if(single_dtw_buf == 0)
+        {
+            status = HAL_ERROR;
+        }
+
+        for(u32 i = 0; i< RING_BUFFER_SIZE; i++)
+        {
+            if(status == HAL_OK)
+            {
+                single_dtw_buf[i] = malloc(RING_BUFFER_SIZE * sizeof(u32));
+
+                if(single_dtw_buf[i] == 0)
+                {
+                    status = HAL_ERROR;
+                }
+            }
+        }
+
+    }
+    else if(mode == MULTI_MODE)
+    {
+        multi_dtw_buf = malloc(MPU_6050_NUM_DIMS * sizeof(u32**));
+
+        if(multi_dtw_buf == 0)
+        {
+            status = HAL_ERROR;
+        }
+
+        for(u32 i = 0; i < MPU_6050_NUM_DIMS; i++)
+        {
+            if(status == HAL_OK)
+            {
+                multi_dtw_buf[i] = malloc(RING_BUFFER_SIZE * sizeof(u32*));
+
+                if(multi_dtw_buf[i] == 0)
+                {
+                    status = HAL_ERROR;
+                }
+
+                for(u32 j = 0; j< RING_BUFFER_SIZE; j++)
+                {
+                    if(status == HAL_OK)
+                    {
+                        multi_dtw_buf[i][j] = malloc(RING_BUFFER_SIZE * sizeof(u32));
+
+                        if(multi_dtw_buf[i][j] == 0)
+                        {
+                            status = HAL_ERROR;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        status = HAL_ERROR;
+    }
+    
+    if(status != HAL_OK)
+    {
+        u32 requested_bytes = (mode == MULTI_MODE ? MPU_6050_NUM_DIMS : 1 ) * RING_BUFFER_SIZE * RING_BUFFER_SIZE; 
+        uart_println("Problem with DTW Init, attempting to allocate %d bytes for mode %s", requested_bytes, mode == MULTI_MODE ? "MULTI" : "SINGLE");
+    }
+
+    return status;
+}
+
+void free_dtw_buf(DTW_MODE mode)
+{
+    if(mode == SINGLE_MODE)
+    {
+        for(u32 i = 0; i< RING_BUFFER_SIZE; i++)
+        {
+            free(single_dtw_buf[i]);
+        }
+
+        free(single_dtw_buf);
+    }
+    else if(mode == MULTI_MODE)
+    {
+        for(u32 i = 0; i< RING_BUFFER_SIZE; i++)
+        {
+            for(u32 j = 0; j< RING_BUFFER_SIZE; j++)
+            {
+                free(multi_dtw_buf[i][j]);
+            }
+
+            free(multi_dtw_buf[i]);
+        }
+
+        free(multi_dtw_buf);
+    }
+
+}
 
 u32 ring_buffer_dimension_sel(buffer_element *data, MPU6050_dimension sel)
 {
@@ -50,21 +155,27 @@ u32 dtw_single(buffer_element *s, buffer_element *t, u32 n, u32 m, MPU6050_dimen
     for(i = 0; i <= n; i++) {
         for(j = 0; j <= m; j++) {
             if (i == 0 && j == 0) {
-                dtw_buf[i][j] = 0;
+                single_dtw_buf[i][j] = 0;
             } else if (i == 0) {
-                dtw_buf[i][j] = 0xFFFFFFFF;
+                single_dtw_buf[i][j] = 0xFFFFFFFF;
             } else if (j == 0) {
-                dtw_buf[i][j] = 0xFFFFFFFF;
+                single_dtw_buf[i][j] = 0xFFFFFFFF;
             } else {
                 u32 cost = abs(ring_buffer_dimension_sel(&s[i - 1], sel) - ring_buffer_dimension_sel(&t[j - 1],sel));
-                dtw_buf[i][j] = cost + MIN(MIN(dtw_buf[i - 1][j], dtw_buf[i][j - 1]), dtw_buf[i - 1][j - 1]);
+                single_dtw_buf[i][j] = cost + MIN(MIN(single_dtw_buf[i - 1][j], single_dtw_buf[i][j - 1]), single_dtw_buf[i - 1][j - 1]);
             }
         }
     }
 
-    u32 distance = dtw_buf[n][m];
+    u32 distance = single_dtw_buf[n][m];
 
     return distance;
+}
+
+//stub
+u32 dtw_multi()
+{
+    return 0;
 }
 
 DTW_Result DTW_Distance( buffer_element* s, buffer_element* t, u32 s_length, u32 t_length)

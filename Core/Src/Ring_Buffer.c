@@ -9,15 +9,23 @@
 buffer_element* ring_buffer[2];
 u32 write_index[2];
 
-void ring_buffer_init(u32 size)
+RING_BUFFER_ERROR_TYPE ring_buffer_init(u32 size)
 {
+	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_SUCCESS;
+
 	ring_buffer_print_function = &MPU6050_print_data;
 
 	//fixme numringbuffers
 	for(int i = 0; i< 2; i++)
 	{
 		ring_buffer[i] =  malloc(size * sizeof(buffer_element));
+		if(ring_buffer[i] == 0)
+		{
+			status = RING_BUFFER_FAIL;
+		}
 	}
+
+	return status;
 }
 
 RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, u8 buf_sel)

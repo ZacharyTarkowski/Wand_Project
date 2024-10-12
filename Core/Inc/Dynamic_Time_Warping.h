@@ -34,8 +34,14 @@ typedef struct dtw_array_data
 
 } dtw_array_data;
 
+typedef enum {
+    SINGLE_MODE, //single, sequential dtw
+    MULTI_MODE //not true multithreaded
+} DTW_MODE;
 
+HAL_StatusTypeDef dtw_init(DTW_MODE mode);
 DTW_Result DTW_Distance( buffer_element* s, buffer_element* t, u32 s_length, u32 t_length);
+void free_dtw_buf(DTW_MODE mode);
 
 
 
