@@ -56,7 +56,7 @@ extern buffer_element* ring_buffer[2];
 static void (*ring_buffer_print_function)(buffer_element* pData);
 
 
-void ring_buffer_init(u32 size);
+RING_BUFFER_ERROR_TYPE ring_buffer_init(u32 size);
 
 RING_BUFFER_ERROR_TYPE ring_buffer_write_element(buffer_element* data, u8 buf_sel);
 RING_BUFFER_ERROR_TYPE ring_buffer_read_element(u32 index, buffer_element* data, u8 buf_sel);
