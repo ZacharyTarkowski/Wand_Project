@@ -92,7 +92,7 @@
 
 #define MPU6050_FIFO_SIZE 1024
 
-#define MPU6050_TIMEOUT HAL_MAX_DELAY-1 //-1 for not infinite timeout in i2c
+#define MPU6050_TIMEOUT 20//HAL_MAX_DELAY-1 //-1 for not infinite timeout in i2c
 
 #define MPU6050_SIZE_SAMPLE_BUFFER 100
 
@@ -112,6 +112,8 @@
 #define MPU_6050_YG_EN    1
 #define MPU_6050_ZG_EN    1
 #define MPU_6050_ACCEL_EN 1
+
+#define MPU_6050_NUM_DIMS MPU_6050_TEMP_EN + MPU_6050_XG_EN + MPU_6050_YG_EN + MPU_6050_ZG_EN + (MPU_6050_ACCEL_EN * 3 )
 
 #define MPU6050_PRINT_CSV 1
 #define MPU6050_PRINT_LABELLED 0
@@ -135,25 +137,25 @@ typedef struct reg
 typedef struct Mpu_6050_data_s
 {
 #if MPU_6050_ACCEL_EN
-	u16 x_accel_data;
-	u16 y_accel_data;
-	u16 z_accel_data;
+	s16 x_accel_data;
+	s16 y_accel_data;
+	s16 z_accel_data;
 #endif
 
 #if MPU_6050_XG_EN
-	u16 x_gyro_data;
+	s16 x_gyro_data;
 #endif
 
 #if MPU_6050_YG_EN
-	u16 y_gyro_data;
+	s16 y_gyro_data;
 #endif
 
 #if MPU_6050_ZG_EN
-	u16 z_gyro_data;
+	s16 z_gyro_data;
 #endif
 
 #if MPU_6050_TEMP_EN
-	u16 temp_data;
+	s16 temp_data;
 #endif
 }Mpu_6050_data_s;
 
@@ -165,6 +167,18 @@ typedef struct MPU6050_accelerometer_handle
 	u8 fifo_config;
 
 }Mpu_6050_handle_s;
+
+
+//fixme rename a majority of these lol
+typedef enum 
+{
+    X_ACCEL_IDX = 0, 
+    Y_ACCEL_IDX = 1,
+    Z_ACCEL_IDX = 2,
+    X_GYRO_IDX  = 3,
+    Y_GYRO_IDX  = 4,
+    Z_GYRO_IDX  = 5
+}MPU6050_dimension;
 
 
 
@@ -189,7 +203,7 @@ typedef struct MPU6050_accelerometer_handle
 HAL_StatusTypeDef MPU6050_read_reg(Mpu_6050_handle_s* handle, u8 address, u8* pData);
 HAL_StatusTypeDef MPU6050_write_reg(Mpu_6050_handle_s* handle, u8 address, u8 data);
 
-HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider);
+HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider, u8 int_config, u8 user_config, u8 dlpf_config);
 
 HAL_StatusTypeDef MPU6050_get_raw_data(Mpu_6050_handle_s* handle, u8* buf);
 
@@ -200,6 +214,8 @@ void MPU6050_print_data(Mpu_6050_data_s* pData);
 
 void MPU6050_read_fifo_data(u32 index, Mpu_6050_data_s* data);
 HAL_StatusTypeDef MPU6050_get_fifo_data(Mpu_6050_handle_s* handle, u8* num_samples);
+
+HAL_StatusTypeDef MPU6050_reset_fifo_(Mpu_6050_handle_s* handle);
 
 
 #endif /* SRC_MPU6050EROMETER_UTILS_H_ */
