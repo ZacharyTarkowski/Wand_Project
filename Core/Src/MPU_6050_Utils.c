@@ -296,7 +296,7 @@ HAL_StatusTypeDef MPU6050_get_fifo_data(Mpu_6050_handle_s* handle, u8* num_sampl
 	status |= MPU6050_read_reg(handle, MPU6050_REG_ADDR_FIFO_COUNTL, &fifo_count[1] );
 	fifo_count_full = (u16)((fifo_count[0]<<8) | fifo_count[1]);
 
-	if(status == HAL_OK)
+	if(status == HAL_OK && fifo_count_full > 0)
 	{
 		status = HAL_I2C_Master_Transmit(handle->i2c_handle, (handle->i2c_address << 1) | 0x00, &address, 1, MPU6050_TIMEOUT);
 		status |= HAL_I2C_Master_Receive(handle->i2c_handle, (handle->i2c_address << 1) | 0x01, g_fifo_read_buffer, fifo_count_full, MPU6050_TIMEOUT);
@@ -342,6 +342,40 @@ void MPU6050_parse_fifo_data(u8* fifoData, Mpu_6050_data_s* pData)
 #if MPU_6050_ZG_EN
 	pData->z_gyro_data = (s16)((fifoData[index]<<8) |  fifoData[index+1]);
 	index += 2;
+#endif
+
+}
+
+void MPU6050_utility_data_buffer_to_struct(s16* data, Mpu_6050_data_s* pData)
+{
+	u32 index = 0;
+#if MPU_6050_TEMP_EN
+	pData->temp_data = (s16)((fifoData[index]<<8) |  fifoData[index+1]);
+	index += 1;
+#endif
+
+#if MPU_6050_ACCEL_EN
+	pData->x_accel_data = data[index];
+	index += 1;
+	pData->y_accel_data = data[index];
+	index += 1;
+	pData->z_accel_data = data[index];
+	index += 1;
+#endif
+
+#if MPU_6050_XG_EN
+	pData->x_gyro_data = data[index];
+	index += 1;
+#endif
+
+#if MPU_6050_YG_EN
+	pData->y_gyro_data = data[index];
+	index += 1;
+#endif
+
+#if MPU_6050_ZG_EN
+	pData->z_gyro_data = data[index];
+	index += 1;
 #endif
 
 }

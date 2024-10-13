@@ -30,7 +30,7 @@ RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, u32 size)
 	return status;
 }
 
-//fixme probably need this out of ring buffer
+//fixme probably need this out of ring buffer source
 RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
@@ -132,6 +132,25 @@ void ring_buffer_clear(ring_buffer_s* pRingBuffer)
 void ring_buffer_destroy(ring_buffer_s* pRingBuffer)
 {
 	free(pRingBuffer->buffer);
+}
+
+RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_parse_data_buffer(ring_buffer_s* pRingBuffer, s16* data)
+{
+	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
+	if(data != 0)
+	{
+		buffer_element tmp_data;
+		for(int i = 0; i< pRingBuffer->size; i++)
+		{
+			memset(&tmp_data,0,sizeof(buffer_element));
+			
+			MPU6050_utility_data_buffer_to_struct(&data[i*(MPU_6050_NUM_DIMS)], &tmp_data);
+
+			ring_buffer_write_element(pRingBuffer, &tmp_data);
+		}
+		status = RING_BUFFER_SUCCESS;
+	}
+	return status;
 }
 
 

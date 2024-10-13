@@ -37,6 +37,7 @@ u32 capture_flag_valid_time;
 
 ring_buffer_s ring_buffer_1;
 ring_buffer_s ring_buffer_2;
+ring_buffer_s circle_spell_ring_buffer;
 
 
 /* USER CODE END Includes */
@@ -82,6 +83,7 @@ typedef enum  {
 	CAPTURE_1,
 	CAPTURE_2,
 	PRINT_AND_COMPARE,
+	COMPARE_STATIC,
 	HARD_RESET
 }WAND_STATE;
 
@@ -111,6 +113,29 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		break;
 	}
 }
+
+s16 raw_spell_data[] = {
+360,16412,2364,-487,98,-298,
+-262,16128,2440,-479,-128,-321,
+-308,16162,2498,-362,-637,-397,
+472,15708,2434,-158,-1135,-156,
+1170,16260,2092,254,-1370,-241,
+1836,15626,1944,488,-945,-97,
+1362,15754,1590,901,-298,-437,
+1218,17076,834,1192,285,-1046,
+1100,17398,550,802,938,-1069,
+384,16900,424,178,1428,-805,
+-100,17032,430,-209,1759,-744,
+-782,17458,560,-682,1782,-847,
+-1490,17036,926,-1566,1453,-840,
+-2130,16634,1666,-2205,675,-433,
+-1228,15818,2122,-2170,-530,-49,
+22,15388,2614,-1427,-1799,168,
+1046,15812,2434,-896,-1420,52,
+646,16562,2526,-506,-494,-344,
+56,15996,2702,-502,49,-256,
+-100,16418,2592,-291,95,-493
+};
 
 
 
@@ -159,6 +184,7 @@ int main(void)
 	
 	status |= ring_buffer_init(&ring_buffer_1, RING_BUFFER_MAX_SIZE);
 	status |= ring_buffer_init(&ring_buffer_2, RING_BUFFER_MAX_SIZE);
+	status |= ring_buffer_init(&circle_spell_ring_buffer, sizeof(raw_spell_data) / (sizeof(s16)*(MPU_6050_NUM_DIMS)) );
 
 	if(status != HAL_OK)
 	{
@@ -170,6 +196,10 @@ int main(void)
 		//status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider );
 		return -1;
 	}
+
+	ring_buffer_MPU6050_parse_data_buffer(&circle_spell_ring_buffer,raw_spell_data);
+
+	ring_buffer_print_all_elements(&circle_spell_ring_buffer);
 	
 
 	if(dtw_init(SINGLE_MODE) != HAL_OK)
@@ -188,6 +218,7 @@ int main(void)
 	u8 toggle_buf = 0;
 
 	WAND_STATE state = CAPTURE_1;
+	DTW_Result result;
 	u8 MPU6050_hard_reset_flag;
 
 	set_led_color(LED_COLOR_RED);
@@ -214,7 +245,7 @@ int main(void)
 					uart_println("Capturing %d",state);
 					first_run = 0;
 					status = MPU6050_reset_fifo_(pMPU6050);
-					//delay needed, otherwise fifo read fails because it got reset
+					//delay needed, otherwise fifo read fails because it got reset? might need to just clear the data ready flag cuz data isnt actually ready
 					HAL_Delay(500);
 					if(status != HAL_OK)
 					{
@@ -253,7 +284,8 @@ int main(void)
 				if( !first_run )
 				{
 					uart_println("Done Capturing %d",state);
-					state++;
+					//state++; //this for comparing two captures
+					state = COMPARE_STATIC; //this for comparing static spell
 					first_run = 1;
 				}
 			}
@@ -265,7 +297,7 @@ int main(void)
 				uart_println("Ring Buffer 2");
 				ring_buffer_print_to_write_index(&ring_buffer_2);
 
-				DTW_Result result = DTW_Distance(ring_buffer_1.buffer, ring_buffer_2.buffer,ring_buffer_1.write_index,ring_buffer_2.write_index);
+				result = DTW_Distance(ring_buffer_1.buffer, ring_buffer_2.buffer,ring_buffer_1.write_index,ring_buffer_2.write_index);
 				print_dtw_result(&result);
 
 				u32 average_dtw = 0;
@@ -299,6 +331,31 @@ int main(void)
 				state = 0;
 
 
+			break;
+
+			case COMPARE_STATIC:
+				uart_println("Ring Buffer 1");
+				ring_buffer_print_to_write_index(&ring_buffer_1);
+				uart_println("Static Spell : Circle");
+				ring_buffer_print_all_elements(&circle_spell_ring_buffer);
+
+
+				result = DTW_Distance(ring_buffer_1.buffer, circle_spell_ring_buffer.buffer,ring_buffer_1.write_index,circle_spell_ring_buffer.size);
+				print_dtw_result(&result);
+
+				if( result.x_accel_result < 12500 && result.y_accel_result < 12500 && result.z_accel_result < 12500 )
+				{
+					set_led_color(LED_COLOR_GREEN);
+				}
+				else
+				{
+					set_led_color(LED_COLOR_RED);
+				}
+				
+
+
+				ring_buffer_clear(&ring_buffer_1);
+				state = CAPTURE_1;
 			break;
 
 			case HARD_RESET:

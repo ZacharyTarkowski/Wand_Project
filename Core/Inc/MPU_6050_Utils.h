@@ -113,7 +113,7 @@
 #define MPU_6050_ZG_EN    1
 #define MPU_6050_ACCEL_EN 1
 
-#define MPU_6050_NUM_DIMS MPU_6050_TEMP_EN + MPU_6050_XG_EN + MPU_6050_YG_EN + MPU_6050_ZG_EN + (MPU_6050_ACCEL_EN * 3 )
+#define MPU_6050_NUM_DIMS (MPU_6050_TEMP_EN + MPU_6050_XG_EN + MPU_6050_YG_EN + MPU_6050_ZG_EN + (MPU_6050_ACCEL_EN * 3 ))
 
 #define MPU6050_PRINT_CSV 1
 #define MPU6050_PRINT_LABELLED 0
@@ -216,6 +216,7 @@ void MPU6050_read_fifo_data(u32 index, Mpu_6050_data_s* data);
 HAL_StatusTypeDef MPU6050_get_fifo_data(Mpu_6050_handle_s* handle, u8* num_samples);
 
 HAL_StatusTypeDef MPU6050_reset_fifo_(Mpu_6050_handle_s* handle);
+void MPU6050_utility_data_buffer_to_struct(s16* data, Mpu_6050_data_s* pData);
 
 
 #endif /* SRC_MPU6050EROMETER_UTILS_H_ */
