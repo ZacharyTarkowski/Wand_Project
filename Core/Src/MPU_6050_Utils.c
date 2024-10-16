@@ -22,6 +22,8 @@
 //#define DEBUG_MPU6050_REGISTER_WRITE_SUCCESS
 #define DEBUG_MPU6050_REGISTER_WRITE_FAIL
 
+#define MPU6050_PRINT_LEVEL_INFO
+
 u8 g_fifo_num_samples = 0;
 u8 g_fifo_read_buffer[MPU6050_FIFO_SIZE] = {0};
 
@@ -199,7 +201,8 @@ u8 MPU6050_calculate_fifo_read_size(u8 fifo_config)
 	return size;
 }
 
-HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider, u8 int_config, u8 user_config, u8 dlpf_config)
+//todo : make inputs to this just config enables, and the frequency instead of knowing what reg values are wanted
+HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider, u8 int_config, u8 user_config, u8 config_reg)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 
@@ -261,8 +264,7 @@ HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c
 		//u8 user_config = 0x40;
 		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_USER_CTRL, user_config);
 
-		//u8 dlpf_config = 0x06;
-		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_CONFIG, dlpf_config);
+		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_CONFIG, config_reg);
 
 		u8 fifo_config = MPU_6050_FIFO_CONFIG_USER_DEFINED;
 		handle->fifo_config = fifo_config;
@@ -270,6 +272,22 @@ HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c
 
 		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_FIFO_EN, fifo_config);
 	}
+
+	#ifdef MPU6050_PRINT_LEVEL_INFO
+
+		u8 dlpf_config = config_reg & DLPF_CFG_MASK;
+		u32 gyro_base_freq = ( dlpf_config == 0 || dlpf_config == 0x7 )  ? 8000 : 1000;
+		u32 accel_base_freq = 1000;
+
+		u32 gyro_sample_rate = gyro_base_freq / sample_rate_divider;
+		u32 accel_sample_rate = accel_base_freq / sample_rate_divider;
+
+		uart_println("Accel Sample Rate : %d Hz, Bandwith : %d Hz", accel_sample_rate, accel_dplf_to_bandwidth_lut[dlpf_config]);
+		uart_println("Gyro Sample Rate : %d Hz, Bandwidth : %d Hz", gyro_sample_rate, gyro_dplf_to_bandwidth_lut[dlpf_config]);
+
+
+		
+	#endif
 
 	if(status == HAL_OK)
 	{

@@ -19,6 +19,14 @@
 extern UART_HandleTypeDef huart2;
 
 
+typedef enum {
+    ADD,
+    SUB,
+    MULTIPLY,
+    DIVIDE,
+}operation_e;
+
+
 #define u8 uint8_t
 #define u16 uint16_t
 #define u32 uint32_t

@@ -153,4 +153,35 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_parse_data_buffer(ring_buffer_s* pRin
 	return status;
 }
 
+//todo add in the rest of the operations
+//todo this also doesnt account for whether or not the vectors are there 
+
+//params : performs a = a (op) b
+void MPU6050_data_operation(Mpu_6050_data_s* a, Mpu_6050_data_s* b, operation_e operation)
+{
+	switch(operation)
+	{
+		case SUB:
+			a->x_accel_data = a->x_accel_data - b->x_accel_data;
+			a->y_accel_data = a->y_accel_data - b->y_accel_data;
+			a->z_accel_data = a->z_accel_data - b->z_accel_data;
+			a->x_gyro_data  = a->x_gyro_data  - b->x_gyro_data ;  
+			a->y_gyro_data  = a->y_gyro_data  - b->y_gyro_data ;
+			a->z_gyro_data  = a->z_gyro_data  - b->z_gyro_data ;
+		break;
+
+	default:
+		uart_println("Unsupported operation on MPU6050 data");
+		break;
+	}
+}
+
+
+void ring_buffer_MPU6050_apply_vector(ring_buffer_s* pRingBuffer, buffer_element* vector, operation_e operation)
+{
+	for(u32 i = 0; i< pRingBuffer->size; i++)
+	{
+		MPU6050_data_operation(&pRingBuffer->buffer[i], vector, SUB);
+	}
+}
 

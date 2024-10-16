@@ -34,10 +34,16 @@ Mpu_6050_handle_s* pMPU6050 = &MPU6050_handle;
 u8 data_ready_flag = 0;
 u8 capture_flag = 0;
 u32 capture_flag_valid_time;
+u8 timer_flag = 0;
 
 ring_buffer_s ring_buffer_1;
 ring_buffer_s ring_buffer_2;
+ring_buffer_s ring_buffer_3;
 ring_buffer_s circle_spell_ring_buffer;
+ring_buffer_s line_spell_ring_buffer;
+
+ring_buffer_s orientation_line_spell_ring_buffer;
+ring_buffer_s orientation_circle_spell_ring_buffer;
 
 
 /* USER CODE END Includes */
@@ -80,12 +86,25 @@ static void MX_TIM3_Init(void);
 /* USER CODE BEGIN 0 */
 
 typedef enum  {
+	IDLE,
 	CAPTURE_1,
 	CAPTURE_2,
 	PRINT_AND_COMPARE,
 	COMPARE_STATIC,
-	HARD_RESET
+	HARD_RESET,
+	MAX_WAND_STATE
 }WAND_STATE;
+
+const char* wand_state_name_lut[MAX_WAND_STATE] = {
+	"IDLE",
+	"CAPTURE_1",
+	"CAPTURE_2",
+	"PRINT_AND_COMPARE",
+	"COMPARE_STATIC",
+	"HARD_RESET",
+	"MAX_WAND_STATE"
+};
+
 
 
 
@@ -114,7 +133,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 }
 
-s16 raw_spell_data[] = {
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if(htim->Instance == htim3.Instance)
+	{
+		timer_flag = 1;
+	}
+}
+
+
+s16 raw_circle_spell_data[] = {
 360,16412,2364,-487,98,-298,
 -262,16128,2440,-479,-128,-321,
 -308,16162,2498,-362,-637,-397,
@@ -136,6 +165,58 @@ s16 raw_spell_data[] = {
 56,15996,2702,-502,49,-256,
 -100,16418,2592,-291,95,-493
 };
+
+s16 raw_orientation_circle_spell_data[] = {
+-214,40,68,-234,693,25,
+-482,-118,190,-336,531,69,
+-692,-298,236,-251,271,-68,
+-348,-430,200,-32,-272,457,
+-346,-618,236,170,-480,421,
+472,-128,-236,648,-741,455,
+892,-222,-486,826,-479,598,
+664,-478,-638,872,-98,435,
+802,-52,-1140,1129,302,368,
+970,338,-1504,1068,690,-226,
+896,234,-1666,688,1142,-220,
+300,162,-1720,429,1602,125,
+198,194,-1830,256,1658,33,
+-224,502,-1804,-111,1555,-553,
+-568,634,-1610,-799,1516,-394,
+-1218,280,-1110,-1488,1077,-140,
+-1176,-226,-784,-1843,320,166,
+-1348,-1290,44,-1670,-653,475,
+1002,-1658,136,-632,-1707,1020,
+2000,116,-428,254,-1088,478,
+986,60,-440,-73,373,373
+};
+
+s16 raw_line_spell_data[] = {
+-1134,16430,1234,-354,-230,-311,
+-730,15990,782,-879,92,-84,
+-404,14662,1516,-735,210,1231,
+-100,15120,1272,295,93,374,
+-18,16544,688,1321,-240,1282,
+670,15524,-292,1331,-274,1224,
+892,18910,-650,1722,-191,131,
+1194,18442,-976,625,-290,-187,
+844,15666,-870,-229,133,-9,
+1194,17140,-928,445,206,57
+};
+
+s16 raw_orientation_line_spell_data[] = {
+100,82,306,-601,-770,-504,
+-50,-116,500,-650,-499,-539,
+40,-1180,674,-680,-750,-31,
+28,-532,732,-309,-566,200,
+432,138,488,189,-618,268,
+592,-72,574,105,-909,173,
+676,922,402,302,-843,84,
+958,984,262,171,-847,10,
+1058,646,308,100,-816,-206,
+970,332,254,-76,-659,-622,
+934,196,192,-78,-562,-730
+};
+
 
 
 
@@ -179,13 +260,18 @@ int main(void)
 
 	//should make a function to calc this automagically
 	// 8000 / (x+1) = desired_sample_rate
+
+	
 	u8 sample_rate_divider = 0x80;//0x14;//0x80;
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
 	
 	status |= ring_buffer_init(&ring_buffer_1, RING_BUFFER_MAX_SIZE);
 	status |= ring_buffer_init(&ring_buffer_2, RING_BUFFER_MAX_SIZE);
-	status |= ring_buffer_init(&circle_spell_ring_buffer, sizeof(raw_spell_data) / (sizeof(s16)*(MPU_6050_NUM_DIMS)) );
-
+	status |= ring_buffer_init(&ring_buffer_3, 10);
+	status |= ring_buffer_init(&circle_spell_ring_buffer, sizeof(raw_circle_spell_data) / (sizeof(s16)*(MPU_6050_NUM_DIMS)) );
+	status |= ring_buffer_init(&line_spell_ring_buffer, sizeof(raw_line_spell_data) / (sizeof(s16)*(MPU_6050_NUM_DIMS)) );
+	status |= ring_buffer_init(&orientation_line_spell_ring_buffer, sizeof(raw_orientation_line_spell_data) / (sizeof(s16)*(MPU_6050_NUM_DIMS)) );
+	status |= ring_buffer_init(&orientation_circle_spell_ring_buffer, sizeof(raw_orientation_circle_spell_data) / (sizeof(s16)*(MPU_6050_NUM_DIMS)) );
 	if(status != HAL_OK)
 	{
 		// hi2c1.Instance->CR1 |= (1<<15);
@@ -197,9 +283,12 @@ int main(void)
 		return -1;
 	}
 
-	ring_buffer_MPU6050_parse_data_buffer(&circle_spell_ring_buffer,raw_spell_data);
+	ring_buffer_MPU6050_parse_data_buffer(&circle_spell_ring_buffer,raw_circle_spell_data);
+	ring_buffer_MPU6050_parse_data_buffer(&line_spell_ring_buffer,raw_line_spell_data);
+	ring_buffer_MPU6050_parse_data_buffer(&orientation_line_spell_ring_buffer,raw_orientation_line_spell_data);
+	ring_buffer_MPU6050_parse_data_buffer(&orientation_circle_spell_ring_buffer,raw_orientation_circle_spell_data);
 
-	ring_buffer_print_all_elements(&circle_spell_ring_buffer);
+	//ring_buffer_print_all_elements(&circle_spell_ring_buffer);
 	
 
 	if(dtw_init(SINGLE_MODE) != HAL_OK)
@@ -216,12 +305,16 @@ int main(void)
 	u32 loopnum = 0;
 	capture_flag = 0;
 	u8 toggle_buf = 0;
+	timer_flag = 0;
 
-	WAND_STATE state = CAPTURE_1;
+	WAND_STATE state = IDLE;
 	DTW_Result result;
 	u8 MPU6050_hard_reset_flag;
 
 	set_led_color(LED_COLOR_RED);
+
+	//HAL_TIM_Base_Start(&htim3);
+	HAL_TIM_Base_Start_IT(&htim3);
 
   /* USER CODE END 2 */
 
@@ -235,6 +328,63 @@ int main(void)
 
 		switch(state)
 		{
+			//this might get annoying
+			//nvm it literally never triggeres lol
+			uart_println("State is : %s", wand_state_name_lut[state] );
+
+
+			case IDLE:
+			if(capture_flag)
+			{
+				first_run = 1;
+				state = CAPTURE_1;
+			}
+			else if(timer_flag)
+			{
+				if(first_run)
+				{
+					//uart_println("Capturing %d",state);
+					first_run = 0;
+					ring_buffer_clear(&ring_buffer_3);
+					status = MPU6050_reset_fifo_(pMPU6050);
+					data_ready_flag = 0;
+					//delay needed, otherwise fifo read fails because it got reset? might need to just clear the data ready flag cuz data isnt actually ready
+					//HAL_Delay(500);
+					if(status != HAL_OK)
+					{
+						uart_println("Failed to reset FIFO!");
+						MPU6050_hard_reset_flag = 1;
+					}
+					loopnum = 0;
+				}
+
+				if(data_ready_flag && !MPU6050_hard_reset_flag)
+				{
+					data_ready_flag = 0;
+					status = ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_3 );
+					if(status != HAL_OK)
+					{
+						uart_println("Read and store failed");
+						MPU6050_hard_reset_flag = 1;
+						
+					}
+
+					timer_flag = 0;
+					
+					first_run = 1;
+					uart_println("Timer Triggered");
+
+					
+
+					ring_buffer_print_to_write_index(&ring_buffer_3);
+
+
+
+				}
+			}
+
+			break;
+
 			case CAPTURE_1:
 			case CAPTURE_2:
 
@@ -245,8 +395,9 @@ int main(void)
 					uart_println("Capturing %d",state);
 					first_run = 0;
 					status = MPU6050_reset_fifo_(pMPU6050);
+					data_ready_flag = 0;
 					//delay needed, otherwise fifo read fails because it got reset? might need to just clear the data ready flag cuz data isnt actually ready
-					HAL_Delay(500);
+					//HAL_Delay(500);
 					if(status != HAL_OK)
 					{
 						uart_println("Failed to reset FIFO!");
@@ -279,23 +430,42 @@ int main(void)
 					loopnum++;
 				}
 			}
-			else
+			
+			if(!capture_flag)
 			{
 				if( !first_run )
 				{
 					uart_println("Done Capturing %d",state);
-					//state++; //this for comparing two captures
+
 					state = COMPARE_STATIC; //this for comparing static spell
+					//state = state == CAPTURE_1 ? CAPTURE_2 : PRINT_AND_COMPARE;//this for comparing two captures
 					first_run = 1;
 				}
 			}
 			break;
 
 			case PRINT_AND_COMPARE:
+
+
 				uart_println("Ring Buffer 1");
 				ring_buffer_print_to_write_index(&ring_buffer_1);
 				uart_println("Ring Buffer 2");
 				ring_buffer_print_to_write_index(&ring_buffer_2);
+
+				//added this in!!
+
+				//DEBUG CODE FOR ORINTATION. DOESNT WORK BECAUSE NEED TO GO IDLE BETWEEN CAPTURES IN ORDER TO SENSE ORIENTATION
+				// ring_buffer_MPU6050_apply_vector(&ring_buffer_1, &ring_buffer_3.buffer[0]);
+				// ring_buffer_MPU6050_apply_vector(&ring_buffer_2, &ring_buffer_3.buffer[0]);
+
+				// uart_println("Ring Buffer 1");
+				// ring_buffer_print_to_write_index(&ring_buffer_1);
+				// uart_println("Ring Buffer 2");
+				// ring_buffer_print_to_write_index(&ring_buffer_2);
+				// uart_println("Ring Buffer 3");
+				// ring_buffer_print_all_elements(&ring_buffer_3);
+
+				
 
 				result = DTW_Distance(ring_buffer_1.buffer, ring_buffer_2.buffer,ring_buffer_1.write_index,ring_buffer_2.write_index);
 				print_dtw_result(&result);
@@ -328,7 +498,7 @@ int main(void)
 
 				ring_buffer_clear(&ring_buffer_1);
 				ring_buffer_clear(&ring_buffer_2);
-				state = 0;
+				state = IDLE;
 
 
 			break;
@@ -336,16 +506,52 @@ int main(void)
 			case COMPARE_STATIC:
 				uart_println("Ring Buffer 1");
 				ring_buffer_print_to_write_index(&ring_buffer_1);
-				uart_println("Static Spell : Circle");
-				ring_buffer_print_all_elements(&circle_spell_ring_buffer);
+				//uart_println("Static Spell : Circle");
+				//ring_buffer_print_all_elements(&circle_spell_ring_buffer);
+
+				uart_println("DEBUG ORIENTATION CODE");
+				ring_buffer_MPU6050_apply_vector(&ring_buffer_1, &ring_buffer_3.buffer[0]);
+				
+				uart_println("Ring Buffer 1");
+				ring_buffer_print_to_write_index(&ring_buffer_1);
+				uart_println("Ring Buffer 3");
+				ring_buffer_print_to_write_index(&ring_buffer_3);
+
+				
+				DTW_Result result_circle = DTW_Distance(ring_buffer_1.buffer, circle_spell_ring_buffer.buffer,ring_buffer_1.write_index,circle_spell_ring_buffer.size);
+				uart_println("Circle");
+				//print_dtw_result(&result_circle);
+
+				DTW_Result result_line = DTW_Distance(ring_buffer_1.buffer, line_spell_ring_buffer.buffer,ring_buffer_1.write_index, line_spell_ring_buffer.size);
+				uart_println("Line");
+				//print_dtw_result(&result_line);
+
+				DTW_Result result_orientation_circle = DTW_Distance(ring_buffer_1.buffer, orientation_circle_spell_ring_buffer.buffer,ring_buffer_1.write_index,orientation_circle_spell_ring_buffer.size);
+				uart_println("Orientation Circle");
+				print_dtw_result(&result_orientation_circle);
+
+				DTW_Result result_orientation_line = DTW_Distance(ring_buffer_1.buffer, orientation_line_spell_ring_buffer.buffer, ring_buffer_1.write_index, orientation_line_spell_ring_buffer.size);
+				uart_println("Orientation Line");
+				print_dtw_result(&result_orientation_line);
 
 
-				result = DTW_Distance(ring_buffer_1.buffer, circle_spell_ring_buffer.buffer,ring_buffer_1.write_index,circle_spell_ring_buffer.size);
-				print_dtw_result(&result);
-
-				if( result.x_accel_result < 12500 && result.y_accel_result < 12500 && result.z_accel_result < 12500 )
+				//once orientation is locked down, realisitcally i only care bout 2 dimensions for simple things like circles
+				//in the actual spell framework would be cool for static spells to tell it the dimensions it cares about, and only compare against those. can also work in fudge factors for different effects
+				if( result_circle.x_accel_result < 12500 && result_circle.y_accel_result < 12500 && result_circle.z_accel_result < 12500 )
 				{
 					set_led_color(LED_COLOR_GREEN);
+				}
+				else if ( result_orientation_circle.x_accel_result < 12500 && result_orientation_circle.y_accel_result < 12500 && result_orientation_circle.z_accel_result < 12500 )
+				{
+					set_led_color(LED_COLOR_PURPLE);
+				}
+				else if ( result_line.x_accel_result < 12500 && result_line.y_accel_result < 12500 && result_line.z_accel_result < 12500)
+				{
+					set_led_color(LED_COLOR_BLUE);
+				}
+				else if ( result_orientation_line.x_accel_result < 12500 && result_orientation_line.y_accel_result < 12500 && result_orientation_line.z_accel_result < 12500 )
+				{
+					set_led_color(LED_COLOR_BROWN);
 				}
 				else
 				{
@@ -355,7 +561,7 @@ int main(void)
 
 
 				ring_buffer_clear(&ring_buffer_1);
-				state = CAPTURE_1;
+				state = IDLE;
 			break;
 
 			case HARD_RESET:
@@ -375,6 +581,11 @@ int main(void)
 				uart_println("UNKNOWN STATE");
 			break;
 
+		}
+
+		if(MPU6050_hard_reset_flag)
+		{
+			state = HARD_RESET;
 		}
 
 	}
@@ -480,9 +691,9 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
+  htim3.Init.Prescaler = 0xFFFF;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 65535;
+  htim3.Init.Period = 25;//should be 50hz //1hz is 1281;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
