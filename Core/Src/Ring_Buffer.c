@@ -161,6 +161,15 @@ void MPU6050_data_operation(Mpu_6050_data_s* a, Mpu_6050_data_s* b, operation_e 
 {
 	switch(operation)
 	{
+		case ADD:
+			a->x_accel_data = a->x_accel_data + b->x_accel_data;
+			a->y_accel_data = a->y_accel_data + b->y_accel_data;
+			a->z_accel_data = a->z_accel_data + b->z_accel_data;
+			a->x_gyro_data  = a->x_gyro_data  + b->x_gyro_data ;  
+			a->y_gyro_data  = a->y_gyro_data  + b->y_gyro_data ;
+			a->z_gyro_data  = a->z_gyro_data  + b->z_gyro_data ;
+		break;
+
 		case SUB:
 			a->x_accel_data = a->x_accel_data - b->x_accel_data;
 			a->y_accel_data = a->y_accel_data - b->y_accel_data;
@@ -168,6 +177,24 @@ void MPU6050_data_operation(Mpu_6050_data_s* a, Mpu_6050_data_s* b, operation_e 
 			a->x_gyro_data  = a->x_gyro_data  - b->x_gyro_data ;  
 			a->y_gyro_data  = a->y_gyro_data  - b->y_gyro_data ;
 			a->z_gyro_data  = a->z_gyro_data  - b->z_gyro_data ;
+		break;
+
+		case MULTIPLY:
+			a->x_accel_data = a->x_accel_data * b->x_accel_data;
+			a->y_accel_data = a->y_accel_data * b->y_accel_data;
+			a->z_accel_data = a->z_accel_data * b->z_accel_data;
+			a->x_gyro_data  = a->x_gyro_data  * b->x_gyro_data ;  
+			a->y_gyro_data  = a->y_gyro_data  * b->y_gyro_data ;
+			a->z_gyro_data  = a->z_gyro_data  * b->z_gyro_data ;
+		break;
+
+		case DIVIDE:
+			a->x_accel_data = a->x_accel_data / b->x_accel_data;
+			a->y_accel_data = a->y_accel_data / b->y_accel_data;
+			a->z_accel_data = a->z_accel_data / b->z_accel_data;
+			a->x_gyro_data  = a->x_gyro_data  / b->x_gyro_data ;  
+			a->y_gyro_data  = a->y_gyro_data  / b->y_gyro_data ;
+			a->z_gyro_data  = a->z_gyro_data  / b->z_gyro_data ;
 		break;
 
 	default:

@@ -28,6 +28,8 @@
 #include "Dynamic_Time_Warping.h"
 #include "LED_Utils.h"
 
+#include "math.h"
+
 
 Mpu_6050_handle_s MPU6050_handle;
 Mpu_6050_handle_s* pMPU6050 = &MPU6050_handle;
@@ -218,7 +220,8 @@ s16 raw_orientation_line_spell_data[] = {
 };
 
 
-
+#define COMPFILTER_ALPHA 0.02
+#define GMPS2 9.81
 
 /* USER CODE END 0 */
 
@@ -262,7 +265,7 @@ int main(void)
 	// 8000 / (x+1) = desired_sample_rate
 
 	
-	u8 sample_rate_divider = 0x80;//0x14;//0x80;
+	u8 sample_rate_divider = 0x20;//0x14;//0x80;
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
 	
 	status |= ring_buffer_init(&ring_buffer_1, RING_BUFFER_MAX_SIZE);
@@ -320,6 +323,14 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+	data_ready_flag = 0;
+	timer_flag = 0;
+
+	float thetaHat_rad = 0.0;
+	float phiHat_rad = 0.0;
+
+
 	while (1)
 	{
     /* USER CODE END WHILE */
@@ -348,6 +359,9 @@ int main(void)
 					ring_buffer_clear(&ring_buffer_3);
 					status = MPU6050_reset_fifo_(pMPU6050);
 					data_ready_flag = 0;
+					timer_flag = 0;
+
+
 					//delay needed, otherwise fifo read fails because it got reset? might need to just clear the data ready flag cuz data isnt actually ready
 					//HAL_Delay(500);
 					if(status != HAL_OK)
@@ -369,17 +383,37 @@ int main(void)
 						
 					}
 
-					timer_flag = 0;
+					
 					
 					first_run = 1;
 					uart_println("Timer Triggered");
 
+					float x_mps2 = (float)(ring_buffer_3.buffer[0].x_accel_data) * 9.81 / 65535.0;
+					float y_mps2 = (float)(ring_buffer_3.buffer[0].y_accel_data) * 9.81 / 65535.0;
+					float z_mps2 = (float)(ring_buffer_3.buffer[0].z_accel_data) * 9.81 / 65535.0;
+					float x_dps  = (float)(ring_buffer_3.buffer[0].x_gyro_data) * 9.81 / 65535.0;
+					float y_dps  = (float)(ring_buffer_3.buffer[0].y_gyro_data) * 9.81 / 65535.0;
+					float z_dps  = (float)(ring_buffer_3.buffer[0].z_gyro_data) * 9.81 / 65535.0;
+
+					float x_rps  = x_dps;
+					float y_rps  = y_dps;
+					float z_rps  = z_dps;
+
+					//uart_println("%f,%f,%f",x_mps2,y_mps2,z_mps2,x_dps,y_dps,z_dps);
+
+					float phiHat_acc_rad = atanf(y_mps2 / z_mps2);
+					float thetaHat_acc_rad = asinf(x_mps2 / GMPS2);
 					
+					float phiDot_rps = x_rps + tanf(thetaHat_rad) * (sinf(phiHat_rad)* y_rps + cosf(phiHat_rad)) * z_rps;
+					float thetaDot_rps = cosf(phiHat_rad)* y_rps + sinf(phiHat_rad) * z_rps;
 
-					ring_buffer_print_to_write_index(&ring_buffer_3);
+					phiHat_rad = COMPFILTER_ALPHA * phiHat_acc_rad +
+						(1.0 - COMPFILTER_ALPHA) * (phiHat_rad + (32.0/1000) * phiDot_rps);
 
+					thetaHat_rad = COMPFILTER_ALPHA * thetaHat_acc_rad +
+						(1.0 - COMPFILTER_ALPHA) * (thetaHat_rad + (32.0/1000) * thetaDot_rps);
 
-
+					uart_println("%f,%f",phiHat_rad ,thetaHat_rad);
 				}
 			}
 
@@ -693,7 +727,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0xFFFF;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 25;//should be 50hz //1hz is 1281;
+  htim3.Init.Period = 40;//should be 50hz //1hz is 1281;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
