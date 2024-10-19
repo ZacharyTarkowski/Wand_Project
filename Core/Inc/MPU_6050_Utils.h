@@ -105,6 +105,8 @@
 #define MPU_6050_ZG_FIFO_EN_MASK (1<<4)
 #define MPU_6050_ACCEL_FIFO_EN_MASK (1<<3)
 
+#define DLPF_CFG_MASK (0x7)
+
 //user defines
 //external data not implemented
 #define MPU_6050_TEMP_EN  0
@@ -126,6 +128,25 @@
 	((MPU_6050_ZG_EN) ? MPU_6050_ZG_FIFO_EN_MASK : 0) | \
 	((MPU_6050_ACCEL_EN) ? MPU_6050_ACCEL_FIFO_EN_MASK : 0)
 
+static const u8 accel_dplf_to_bandwidth_lut[] = {
+	260,
+	184,
+	94,
+	44,
+	21,
+	10,
+	5
+};
+
+static const u8 gyro_dplf_to_bandwidth_lut[] = {
+	256,
+	188,
+	98,
+	42,
+	20,
+	10,
+	5
+};
 
 
 typedef struct reg
@@ -185,7 +206,16 @@ typedef enum
 #if MPU6050_PRINT_CSV
 
 #define MPU6050_PRINT_FUNCTION uart_printf
+#define MPU6050_PRINT_FLOAT_EN 0
+
+#if MPU6050_PRINT_FLOAT_EN
+#define MPU6050_PRINT_FMT "%f,"
+#define MPU6050_PRINT_DATA_TYPE float
+#else
 #define MPU6050_PRINT_FMT "%d,"
+#define MPU6050_PRINT_DATA_TYPE s16
+#endif
+
 #define MPU6050_PRINT_LAST_LINE uart_println("")
 
 #elif MPU6050_PRINT_LABELLED
@@ -203,7 +233,7 @@ typedef enum
 HAL_StatusTypeDef MPU6050_read_reg(Mpu_6050_handle_s* handle, u8 address, u8* pData);
 HAL_StatusTypeDef MPU6050_write_reg(Mpu_6050_handle_s* handle, u8 address, u8 data);
 
-HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider, u8 int_config, u8 user_config, u8 dlpf_config);
+HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider, u8 int_config, u8 user_config, u8 config_reg);
 
 HAL_StatusTypeDef MPU6050_get_raw_data(Mpu_6050_handle_s* handle, u8* buf);
 

@@ -47,6 +47,7 @@ typedef struct ring_buffer_s
     void (*print_function)(buffer_element* pData);
 } ring_buffer_s;
 
+
 //extern u32 write_index[2];
 //static buffer_element ring_buffer[RING_BUFFER_MAX_SIZE];
 

@@ -20,7 +20,7 @@
 UART_HandleTypeDef huart2;
 static char msg_buf[512];
 
-const char* newlineBuffer = "\n\r";
+const char* newlineBuffer = "\r\n";
 
 //todo fix newlines
 void printstring(char* msg)

@@ -22,6 +22,8 @@
 //#define DEBUG_MPU6050_REGISTER_WRITE_SUCCESS
 #define DEBUG_MPU6050_REGISTER_WRITE_FAIL
 
+#define MPU6050_PRINT_LEVEL_INFO
+
 u8 g_fifo_num_samples = 0;
 u8 g_fifo_read_buffer[MPU6050_FIFO_SIZE] = {0};
 
@@ -199,7 +201,8 @@ u8 MPU6050_calculate_fifo_read_size(u8 fifo_config)
 	return size;
 }
 
-HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider, u8 int_config, u8 user_config, u8 dlpf_config)
+//todo : make inputs to this just config enables, and the frequency instead of knowing what reg values are wanted
+HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c_handle, u8 i2c_address, u8 sample_rate_divider, u8 int_config, u8 user_config, u8 config_reg)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 
@@ -261,8 +264,7 @@ HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c
 		//u8 user_config = 0x40;
 		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_USER_CTRL, user_config);
 
-		//u8 dlpf_config = 0x06;
-		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_CONFIG, dlpf_config);
+		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_CONFIG, config_reg);
 
 		u8 fifo_config = MPU_6050_FIFO_CONFIG_USER_DEFINED;
 		handle->fifo_config = fifo_config;
@@ -270,6 +272,22 @@ HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c
 
 		status |= MPU6050_write_reg(handle, MPU6050_REG_ADDR_FIFO_EN, fifo_config);
 	}
+
+	#ifdef MPU6050_PRINT_LEVEL_INFO
+
+		u8 dlpf_config = config_reg & DLPF_CFG_MASK;
+		u32 gyro_base_freq = ( dlpf_config == 0 || dlpf_config == 0x7 )  ? 8000 : 1000;
+		u32 accel_base_freq = 1000;
+
+		u32 gyro_sample_rate = gyro_base_freq / sample_rate_divider;
+		u32 accel_sample_rate = accel_base_freq / sample_rate_divider;
+
+		uart_println("Accel Sample Rate : %d Hz, Bandwith : %d Hz", accel_sample_rate, accel_dplf_to_bandwidth_lut[dlpf_config]);
+		uart_println("Gyro Sample Rate : %d Hz, Bandwidth : %d Hz", gyro_sample_rate, gyro_dplf_to_bandwidth_lut[dlpf_config]);
+
+
+		
+	#endif
 
 	if(status == HAL_OK)
 	{
@@ -412,21 +430,21 @@ void MPU6050_print_data(Mpu_6050_data_s* pData)
 #endif
 
 #if MPU_6050_ACCEL_EN
-	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (s16)pData->x_accel_data);
-	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (s16)pData->y_accel_data);
-	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (s16)pData->z_accel_data);
+	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (MPU6050_PRINT_DATA_TYPE)pData->x_accel_data);
+	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (MPU6050_PRINT_DATA_TYPE)pData->y_accel_data);
+	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (MPU6050_PRINT_DATA_TYPE)pData->z_accel_data);
 #endif
 
 #if MPU_6050_XG_EN
-	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (s16)pData->x_gyro_data);
+	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (MPU6050_PRINT_DATA_TYPE)pData->x_gyro_data);
 #endif
 
 #if MPU_6050_YG_EN
-	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (s16)pData->y_gyro_data);
+	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (MPU6050_PRINT_DATA_TYPE)pData->y_gyro_data);
 #endif
 
 #if MPU_6050_ZG_EN
-	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (s16)pData->z_gyro_data);
+	MPU6050_PRINT_FUNCTION( MPU6050_PRINT_FMT, (MPU6050_PRINT_DATA_TYPE)pData->z_gyro_data);
 #endif
 
 	MPU6050_PRINT_LAST_LINE;
@@ -479,3 +497,118 @@ HAL_StatusTypeDef MPU6050_reset_fifo_(Mpu_6050_handle_s* handle)
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/**********************************************************/
+/* Rainy Day Orientation Code*/
+
+/*
+else if(timer_flag)
+			{
+				timer_flag = 0;
+				if(first_run)
+				{
+					first_run = 0;
+					data_ready_flag = 0;
+					ring_buffer_clear(&ring_buffer_3);
+					status = MPU6050_reset_fifo_(pMPU6050);
+					
+					
+					if(status != HAL_OK)
+					{
+						uart_println("Failed to reset FIFO!");
+						MPU6050_hard_reset_flag = 1;
+					}
+					loopnum = 0;
+				}
+
+				if(data_ready_flag && !MPU6050_hard_reset_flag)
+				{
+					data_ready_flag = 0;
+					first_run = 1;
+
+					status = ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_3 );
+					if(status != HAL_OK)
+					{
+						uart_println("Read and store failed");
+						MPU6050_hard_reset_flag = 1;
+						
+					}
+
+					ring_buffer_print_to_write_index(&ring_buffer_3);
+
+					float x_mps2 = (float)(ring_buffer_3.buffer[0].x_accel_data)  / 16384.0 ; 
+					float y_mps2 = (float)(ring_buffer_3.buffer[0].y_accel_data)  / 16384.0;
+					float z_mps2 = (float)(ring_buffer_3.buffer[0].z_accel_data)  / 16384.0;
+					float x_dps  = (float)(ring_buffer_3.buffer[0].x_gyro_data)  / 16384.0;
+					float y_dps  = (float)(ring_buffer_3.buffer[0].y_gyro_data)  / 16384.0;
+					float z_dps  = (float)(ring_buffer_3.buffer[0].z_gyro_data)  / 16384.0;
+
+					x_mps2 = x_mps2 * 9.81;
+					y_mps2 = y_mps2 * 9.81;
+					z_mps2 = z_mps2 * 9.81;
+
+					//uart_println("%f,%f,%f,%f,%f,%f",x_mps2,y_mps2,z_mps2,x_dps,y_dps,z_dps);
+
+					integral_x_accel = integral_x_accel + PERIOD * x_mps2; 
+					integral_y_accel = integral_y_accel + PERIOD * y_mps2; 
+					integral_z_accel = integral_z_accel + PERIOD * z_mps2; 
+					integral_x_gyro  = integral_x_gyro  + PERIOD * x_dps ; 
+					integral_y_gyro  = integral_y_gyro  + PERIOD * y_dps ; 
+					integral_z_gyro  = integral_z_gyro  + PERIOD * z_dps ; 
+
+					float x_angle_accel = atanf(x_mps2 / (sqrt(y_mps2*y_mps2 + z_mps2*z_mps2))) ;
+					float y_angle_accel = atanf(y_mps2 / (sqrt(x_mps2*x_mps2 + z_mps2*z_mps2)))  ;
+					float z_angle_accel = atanf((sqrt(x_mps2*x_mps2 + y_mps2*y_mps2)) / z_mps2) ;
+					
+
+					// uart_println("%f,%f,%f,%f,%f,%f",
+					// x_angle_accel,
+					// y_angle_accel,
+					// z_angle_accel,
+					// integral_x_gyro ,
+					// integral_y_gyro ,
+					// integral_z_gyro 
+					
+					// );
+
+					// float fudgefactor = 0.0;
+					// float x_nograv = x_mps2 - ( (9.81-fudgefactor) * sinf(x_angle_accel) ); //can probably cancel some terms by combining with the angle calc function
+					// float y_nograv = y_mps2 - ( (9.81-fudgefactor) * sinf(y_angle_accel) );
+					// float z_nograv = z_mps2 - ( (9.81-fudgefactor) * cosf(z_angle_accel) );
+
+					// if(x_nograv != NAN && y_nograv != NAN && z_nograv != NAN)
+					// {
+					// 	uart_println("%f,%f,%f,%f,%f,%f,%f,%f,%f",x_nograv,y_nograv,z_nograv,
+					// 	x_angle_accel* (180.0/3.14) ,
+					// 	y_angle_accel* (180.0/3.14) ,
+					// 	z_angle_accel* (180.0/3.14) ,
+					// 	x_mps2,y_mps2,z_mps2);
+					// }
+					
+				}
+			}
+			*/
