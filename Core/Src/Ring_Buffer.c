@@ -214,40 +214,42 @@ void ring_buffer_MPU6050_apply_vector(ring_buffer_s* pRingBuffer, buffer_element
 
 void ring_buffer_MPU6050_apply_mean_centering(ring_buffer_s* pRingBuffer)
 {
+	s32 mean_x_accel_data = 0;
+	s32 mean_y_accel_data = 0;
+	s32 mean_z_accel_data = 0;
+	s32 mean_x_gyro_data  = 0;
+	s32 mean_y_gyro_data  = 0;
+	s32 mean_z_gyro_data  = 0;
+
 	if(pRingBuffer->write_index != 0)
 	{
-		u32 mean_x_accel_data = 0;
-		u32 mean_y_accel_data = 0;
-		u32 mean_z_accel_data = 0;
-		u32 mean_x_gyro_data  = 0;
-		u32 mean_y_gyro_data  = 0;
-		u32 mean_z_gyro_data  = 0;
+		
 
-		for(u32 i; i<pRingBuffer->write_index; i++)
+		for(u32 i = 0; i<pRingBuffer->write_index; i++)
 		{
-			mean_x_accel_data += pRingBuffer->buffer[i].x_accel_data;
-			mean_y_accel_data += pRingBuffer->buffer[i].y_accel_data;
-			mean_z_accel_data += pRingBuffer->buffer[i].z_accel_data;
-			mean_x_gyro_data  += pRingBuffer->buffer[i].x_gyro_data ;
-			mean_y_gyro_data  += pRingBuffer->buffer[i].y_gyro_data ;
-			mean_z_gyro_data  += pRingBuffer->buffer[i].z_gyro_data ;
+			mean_x_accel_data += (s32)pRingBuffer->buffer[i].x_accel_data;
+			mean_y_accel_data += (s32)pRingBuffer->buffer[i].y_accel_data;
+			mean_z_accel_data += (s32)pRingBuffer->buffer[i].z_accel_data;
+			mean_x_gyro_data  += (s32)pRingBuffer->buffer[i].x_gyro_data ;
+			mean_y_gyro_data  += (s32)pRingBuffer->buffer[i].y_gyro_data ;
+			mean_z_gyro_data  += (s32)pRingBuffer->buffer[i].z_gyro_data ;
 		}
 
-		mean_x_accel_data = mean_x_accel_data / pRingBuffer->write_index;
-		mean_y_accel_data = mean_y_accel_data / pRingBuffer->write_index;
-		mean_z_accel_data = mean_z_accel_data / pRingBuffer->write_index;
-		mean_x_gyro_data  = mean_x_gyro_data  / pRingBuffer->write_index;
-		mean_y_gyro_data  = mean_y_gyro_data  / pRingBuffer->write_index;
-		mean_z_gyro_data  = mean_z_gyro_data  / pRingBuffer->write_index;
+		mean_x_accel_data = mean_x_accel_data / (s32)pRingBuffer->write_index;
+		mean_y_accel_data = mean_y_accel_data / (s32)pRingBuffer->write_index;
+		mean_z_accel_data = mean_z_accel_data / (s32)pRingBuffer->write_index;
+		mean_x_gyro_data  = mean_x_gyro_data  / (s32)pRingBuffer->write_index;
+		mean_y_gyro_data  = mean_y_gyro_data  / (s32)pRingBuffer->write_index;
+		mean_z_gyro_data  = mean_z_gyro_data  / (s32)pRingBuffer->write_index;
 
-		for(u32 i; i<pRingBuffer->write_index; i++)
+		for(u32 i = 0; i<pRingBuffer->write_index; i++)
 		{
-			pRingBuffer->buffer[i].x_accel_data -= mean_x_accel_data;
-			pRingBuffer->buffer[i].y_accel_data -= mean_y_accel_data;
-			pRingBuffer->buffer[i].z_accel_data -= mean_z_accel_data;
-			pRingBuffer->buffer[i].x_gyro_data  -= mean_x_gyro_data  ;
-			pRingBuffer->buffer[i].y_gyro_data  -= mean_y_gyro_data  ;
-			pRingBuffer->buffer[i].z_gyro_data  -= mean_z_gyro_data  ;
+			pRingBuffer->buffer[i].x_accel_data -= (s16)mean_x_accel_data;
+			pRingBuffer->buffer[i].y_accel_data -= (s16)mean_y_accel_data;
+			pRingBuffer->buffer[i].z_accel_data -= (s16)mean_z_accel_data;
+			pRingBuffer->buffer[i].x_gyro_data  -= (s16)mean_x_gyro_data  ;
+			pRingBuffer->buffer[i].y_gyro_data  -= (s16)mean_y_gyro_data  ;
+			pRingBuffer->buffer[i].z_gyro_data  -= (s16)mean_z_gyro_data  ;
 		}
 	}
 }
