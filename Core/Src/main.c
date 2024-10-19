@@ -223,7 +223,7 @@ s16 raw_orientation_line_spell_data[] = {
 #define COMPFILTER_ALPHA 0.02
 #define GMPS2 9.81
 
-#define FREQ 32.0
+#define FREQ 100
 #define PERIOD (1.0 / FREQ)
 
 /* USER CODE END 0 */
@@ -268,7 +268,7 @@ int main(void)
 	// 8000 / (x+1) = desired_sample_rate
 
 	
-	u8 sample_rate_divider = 1000/FREQ;
+	u8 sample_rate_divider = 10;
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
 	
 	status |= ring_buffer_init(&ring_buffer_1, RING_BUFFER_MAX_SIZE);
@@ -297,10 +297,10 @@ int main(void)
 	//ring_buffer_print_all_elements(&circle_spell_ring_buffer);
 	
 
-	if(dtw_init(SINGLE_MODE) != HAL_OK)
-	{
-		return -1;
-	}
+	// if(dtw_init(SINGLE_MODE) != HAL_OK)
+	// {
+	// 	return -1;
+	// }
 	
 
 	u8 toggle = 0;
@@ -376,8 +376,7 @@ int main(void)
 					first_run = 0;
 					status = MPU6050_reset_fifo_(pMPU6050);
 					data_ready_flag = 0;
-					//delay needed, otherwise fifo read fails because it got reset? might need to just clear the data ready flag cuz data isnt actually ready
-					//HAL_Delay(500);
+
 					if(status != HAL_OK)
 					{
 						uart_println("Failed to reset FIFO!");
@@ -426,21 +425,14 @@ int main(void)
 
 			case PRINT_AND_COMPARE:
 
-				for(u32 i = 0; i<150; i++)
-				{
-					//uart_println("%d, %d, %d",0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF);
-				}
-
 				uart_println("Ring Buffer 1");
+				//ring_buffer_print_to_write_index(&ring_buffer_1);
+				ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_1);
 				ring_buffer_print_to_write_index(&ring_buffer_1);
 
-				//for serial oscilloscope
-				for(u32 i = 0; i<150; i++)
-				{
-					//uart_println("%d, %d, %d",0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF);
-				}
-
 				uart_println("Ring Buffer 2");
+				//ring_buffer_print_to_write_index(&ring_buffer_2);
+				ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_2);
 				ring_buffer_print_to_write_index(&ring_buffer_2);
 
 				//added this in!!
@@ -458,12 +450,12 @@ int main(void)
 
 				
 
-				result = DTW_Distance(ring_buffer_1.buffer, ring_buffer_2.buffer,ring_buffer_1.write_index,ring_buffer_2.write_index);
-				print_dtw_result(&result);
+				//result = DTW_Distance(ring_buffer_1.buffer, ring_buffer_2.buffer,ring_buffer_1.write_index,ring_buffer_2.write_index);
+				//print_dtw_result(&result);
 
 				u32 average_dtw = 0;
-				average_dtw = (result.x_accel_result + result.y_accel_result + result.z_accel_result + result.x_gyro_result + result.y_gyro_result + result.z_gyro_result ) / ( MPU_6050_NUM_DIMS );
-				uart_println("Avg DTW %d",average_dtw);
+				//average_dtw = (result.x_accel_result + result.y_accel_result + result.z_accel_result + result.x_gyro_result + result.y_gyro_result + result.z_gyro_result ) / ( MPU_6050_NUM_DIMS );
+				//uart_println("Avg DTW %d",average_dtw);
 
 				//normalization?
 				// result.x_accel_result = result.x_accel_result / average_dtw;
@@ -500,8 +492,8 @@ int main(void)
 				//uart_println("Static Spell : Circle");
 				//ring_buffer_print_all_elements(&circle_spell_ring_buffer);
 
-				uart_println("DEBUG ORIENTATION CODE");
-				ring_buffer_MPU6050_apply_vector(&ring_buffer_1, &ring_buffer_3.buffer[0]);
+				//uart_println("DEBUG ORIENTATION CODE");
+				//ring_buffer_MPU6050_apply_vector(&ring_buffer_1, &ring_buffer_3.buffer[0]);
 				
 				uart_println("Ring Buffer 1");
 				ring_buffer_print_to_write_index(&ring_buffer_1);

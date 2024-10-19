@@ -77,7 +77,7 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_parse_data_buffer(ring_buffer_s* pRin
 
 void ring_buffer_clear(ring_buffer_s* pRingBuffer);
 void ring_buffer_destroy(ring_buffer_s* pRingBuffer);
-
+void ring_buffer_MPU6050_apply_mean_centering(ring_buffer_s* pRingBuffer);
 
 
 
