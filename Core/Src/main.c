@@ -223,6 +223,9 @@ s16 raw_orientation_line_spell_data[] = {
 #define COMPFILTER_ALPHA 0.02
 #define GMPS2 9.81
 
+#define FREQ 32.0
+#define PERIOD (1.0 / FREQ)
+
 /* USER CODE END 0 */
 
 /**
@@ -265,7 +268,7 @@ int main(void)
 	// 8000 / (x+1) = desired_sample_rate
 
 	
-	u8 sample_rate_divider = 0x20;//0x14;//0x80;
+	u8 sample_rate_divider = 1000/FREQ;
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
 	
 	status |= ring_buffer_init(&ring_buffer_1, RING_BUFFER_MAX_SIZE);
@@ -330,6 +333,14 @@ int main(void)
 	float thetaHat_rad = 0.0;
 	float phiHat_rad = 0.0;
 
+	float integral_x_accel = 0; 
+	float integral_y_accel = 0; 
+	float integral_z_accel = 0; 
+	float integral_x_gyro  = 0; 
+	float integral_y_gyro  = 0; 
+	float integral_z_gyro  = 0; 
+
+
 
 	while (1)
 	{
@@ -350,72 +361,7 @@ int main(void)
 				first_run = 1;
 				state = CAPTURE_1;
 			}
-			else if(timer_flag)
-			{
-				if(first_run)
-				{
-					//uart_println("Capturing %d",state);
-					first_run = 0;
-					ring_buffer_clear(&ring_buffer_3);
-					status = MPU6050_reset_fifo_(pMPU6050);
-					data_ready_flag = 0;
-					timer_flag = 0;
-
-
-					//delay needed, otherwise fifo read fails because it got reset? might need to just clear the data ready flag cuz data isnt actually ready
-					//HAL_Delay(500);
-					if(status != HAL_OK)
-					{
-						uart_println("Failed to reset FIFO!");
-						MPU6050_hard_reset_flag = 1;
-					}
-					loopnum = 0;
-				}
-
-				if(data_ready_flag && !MPU6050_hard_reset_flag)
-				{
-					data_ready_flag = 0;
-					status = ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_3 );
-					if(status != HAL_OK)
-					{
-						uart_println("Read and store failed");
-						MPU6050_hard_reset_flag = 1;
-						
-					}
-
-					
-					
-					first_run = 1;
-					uart_println("Timer Triggered");
-
-					float x_mps2 = (float)(ring_buffer_3.buffer[0].x_accel_data) * 9.81 / 65535.0;
-					float y_mps2 = (float)(ring_buffer_3.buffer[0].y_accel_data) * 9.81 / 65535.0;
-					float z_mps2 = (float)(ring_buffer_3.buffer[0].z_accel_data) * 9.81 / 65535.0;
-					float x_dps  = (float)(ring_buffer_3.buffer[0].x_gyro_data) * 9.81 / 65535.0;
-					float y_dps  = (float)(ring_buffer_3.buffer[0].y_gyro_data) * 9.81 / 65535.0;
-					float z_dps  = (float)(ring_buffer_3.buffer[0].z_gyro_data) * 9.81 / 65535.0;
-
-					float x_rps  = x_dps;
-					float y_rps  = y_dps;
-					float z_rps  = z_dps;
-
-					//uart_println("%f,%f,%f",x_mps2,y_mps2,z_mps2,x_dps,y_dps,z_dps);
-
-					float phiHat_acc_rad = atanf(y_mps2 / z_mps2);
-					float thetaHat_acc_rad = asinf(x_mps2 / GMPS2);
-					
-					float phiDot_rps = x_rps + tanf(thetaHat_rad) * (sinf(phiHat_rad)* y_rps + cosf(phiHat_rad)) * z_rps;
-					float thetaDot_rps = cosf(phiHat_rad)* y_rps + sinf(phiHat_rad) * z_rps;
-
-					phiHat_rad = COMPFILTER_ALPHA * phiHat_acc_rad +
-						(1.0 - COMPFILTER_ALPHA) * (phiHat_rad + (32.0/1000) * phiDot_rps);
-
-					thetaHat_rad = COMPFILTER_ALPHA * thetaHat_acc_rad +
-						(1.0 - COMPFILTER_ALPHA) * (thetaHat_rad + (32.0/1000) * thetaDot_rps);
-
-					uart_println("%f,%f",phiHat_rad ,thetaHat_rad);
-				}
-			}
+			
 
 			break;
 
@@ -471,8 +417,8 @@ int main(void)
 				{
 					uart_println("Done Capturing %d",state);
 
-					state = COMPARE_STATIC; //this for comparing static spell
-					//state = state == CAPTURE_1 ? CAPTURE_2 : PRINT_AND_COMPARE;//this for comparing two captures
+					//state = COMPARE_STATIC; //this for comparing static spell
+					state = state == CAPTURE_1 ? CAPTURE_2 : PRINT_AND_COMPARE;//this for comparing two captures
 					first_run = 1;
 				}
 			}
@@ -480,9 +426,20 @@ int main(void)
 
 			case PRINT_AND_COMPARE:
 
+				for(u32 i = 0; i<150; i++)
+				{
+					//uart_println("%d, %d, %d",0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF);
+				}
 
 				uart_println("Ring Buffer 1");
 				ring_buffer_print_to_write_index(&ring_buffer_1);
+
+				//for serial oscilloscope
+				for(u32 i = 0; i<150; i++)
+				{
+					//uart_println("%d, %d, %d",0x7FFFFFFF,0x7FFFFFFF,0x7FFFFFFF);
+				}
+
 				uart_println("Ring Buffer 2");
 				ring_buffer_print_to_write_index(&ring_buffer_2);
 
@@ -727,7 +684,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 0xFFFF;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 40;//should be 50hz //1hz is 1281;
+  htim3.Init.Period = 1281 / FREQ;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)

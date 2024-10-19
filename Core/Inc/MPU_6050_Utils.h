@@ -206,7 +206,16 @@ typedef enum
 #if MPU6050_PRINT_CSV
 
 #define MPU6050_PRINT_FUNCTION uart_printf
+#define MPU6050_PRINT_FLOAT_EN 0
+
+#if MPU6050_PRINT_FLOAT_EN
+#define MPU6050_PRINT_FMT "%f,"
+#define MPU6050_PRINT_DATA_TYPE float
+#else
 #define MPU6050_PRINT_FMT "%d,"
+#define MPU6050_PRINT_DATA_TYPE s16
+#endif
+
 #define MPU6050_PRINT_LAST_LINE uart_println("")
 
 #elif MPU6050_PRINT_LABELLED
