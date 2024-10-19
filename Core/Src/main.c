@@ -417,8 +417,8 @@ int main(void)
 				{
 					uart_println("Done Capturing %d",state);
 
-					//state = COMPARE_STATIC; //this for comparing static spell
-					state = state == CAPTURE_1 ? CAPTURE_2 : PRINT_AND_COMPARE;//this for comparing two captures
+					state = COMPARE_STATIC; //this for comparing static spell
+					//state = state == CAPTURE_1 ? CAPTURE_2 : PRINT_AND_COMPARE;//this for comparing two captures
 					first_run = 1;
 				}
 			}
@@ -432,6 +432,7 @@ int main(void)
 				}
 
 				uart_println("Ring Buffer 1");
+				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_1);
 				ring_buffer_print_to_write_index(&ring_buffer_1);
 
 				//for serial oscilloscope
@@ -441,6 +442,7 @@ int main(void)
 				}
 
 				uart_println("Ring Buffer 2");
+				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_2);
 				ring_buffer_print_to_write_index(&ring_buffer_2);
 
 				//added this in!!
