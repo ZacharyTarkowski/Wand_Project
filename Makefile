@@ -42,6 +42,9 @@ Core/Src/Ring_Buffer.c \
 Core/Src/General_Utils.c \
 Core/Src/Dynamic_Time_Warping.c \
 Core/Src/LED_Utils.c \
+Core/Src/dd_dtw.c \
+Core/Src/dd_ed.c \
+Core/Src/dd_globals.c \
 Core/Src/stm32f4xx_it.c \
 Core/Src/stm32f4xx_hal_msp.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.c \
