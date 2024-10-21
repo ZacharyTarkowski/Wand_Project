@@ -30,6 +30,8 @@
 
 #include "math.h"
 
+#include "dd_dtw.h"
+
 
 Mpu_6050_handle_s MPU6050_handle;
 Mpu_6050_handle_s* pMPU6050 = &MPU6050_handle;
@@ -340,7 +342,15 @@ int main(void)
 	float integral_y_gyro  = 0; 
 	float integral_z_gyro  = 0; 
 
+	DTWSettings default_settings = dtw_settings_default(); 
+	seq_t test1[] = {1,2,3,4,5,6};
+	seq_t test2[] = {6,5,4,3,2,1};
+	seq_t result2 = dtw_distance(test1, 6, test2, 6, &default_settings);
 
+	uart_println("Newdtw dist %f", result2);
+
+seq_t data_buf_1[RING_BUFFER_MAX_SIZE];
+seq_t data_buf_2[RING_BUFFER_MAX_SIZE];
 
 	while (1)
 	{
@@ -435,6 +445,22 @@ int main(void)
 				ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_2);
 				ring_buffer_print_to_write_index(&ring_buffer_2);
 
+
+				
+				//AWFUL AWFUL AWFUL
+				for(u32 i = 0; i<ring_buffer_1.write_index; i++)
+				{
+					data_buf_1[i] = (seq_t)ring_buffer_1.buffer[i].x_accel_data;
+				}
+
+				for(u32 i = 0; i<ring_buffer_2.write_index; i++)
+				{
+					data_buf_2[i] = (seq_t)ring_buffer_2.buffer[i].x_accel_data;
+				}
+
+				seq_t result_new = dtw_distance(data_buf_1, ring_buffer_1.write_index,data_buf_2, ring_buffer_2.write_index,&default_settings);
+				uart_println("New X accel dtw %d",result_new);
+
 				//added this in!!
 
 				//DEBUG CODE FOR ORINTATION. DOESNT WORK BECAUSE NEED TO GO IDLE BETWEEN CAPTURES IN ORDER TO SENSE ORIENTATION
@@ -467,6 +493,8 @@ int main(void)
 				
 				// uart_println("Normalized DTW Maybe");
 				// print_dtw_result(&result);
+
+				
 
 				if( result.x_accel_result < 12500 && result.y_accel_result < 12500 && result.z_accel_result < 12500 )
 				{
