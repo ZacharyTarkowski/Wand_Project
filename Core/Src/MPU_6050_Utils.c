@@ -135,7 +135,7 @@ HAL_StatusTypeDef MPU6050_read_reg(Mpu_6050_handle_s* handle, u8 address, u8* pD
 #ifdef DEBUG_MPU6050_REGISTER_READ_FAIL
 	if(status != HAL_OK)
 	{
-		uart_println("Failed to read %s", get_reg_name(address));
+		uart_println("Failed to read %s, %x", get_reg_name(address),address);
 	}
 #endif
 
@@ -163,7 +163,7 @@ HAL_StatusTypeDef MPU6050_write_reg(Mpu_6050_handle_s* handle, u8 address, u8 da
 #ifdef DEBUG_MPU6050_REGISTER_WRITE_FAIL
 	if(status != HAL_OK)
 		{
-			uart_println("Failed to write %s", get_reg_name(address));
+			uart_println("Failed to write %s, %x", get_reg_name(address),address);
 		}
 #endif
 

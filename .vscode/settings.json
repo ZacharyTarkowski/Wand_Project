@@ -7,7 +7,12 @@
         "mpu_6050_utils.h": "c",
         "dynamic_time_warping.h": "c",
         "stm32f4xx_hal.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "dd_dtw.h": "c",
+        "dd_globals.h": "c",
+        "dd_ed.h": "c",
+        "time.h": "c",
+        "stdint.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }
