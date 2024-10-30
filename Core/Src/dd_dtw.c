@@ -17,7 +17,7 @@ extern seq_t* dtw;
 /* Create settings struct with default values (all extras deactivated). */
 DTWSettings dtw_settings_default(void) {
     DTWSettings s = {
-        .window = 0,
+        .window = 25,
         .max_dist = 0,
         .max_step = 0,
         .max_length_diff = 0,
@@ -296,7 +296,7 @@ seq_t dtw_distance(seq_t *s1, idx_t l1,
         }
         result = sqrt(psi_shortest);
     }
-    free(dtw);
+    //free(dtw);
     // signal(SIGINT, SIG_DFL);  // not compatible with OMP
     if (settings->max_dist !=0 && result > settings->max_dist) {
         // DTWPruned keeps the last value larger than max_dist. Correct for this.

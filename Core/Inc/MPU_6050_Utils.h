@@ -92,7 +92,7 @@
 
 #define MPU6050_FIFO_SIZE 1024
 
-#define MPU6050_TIMEOUT 20//HAL_MAX_DELAY-1 //-1 for not infinite timeout in i2c
+#define MPU6050_TIMEOUT HAL_MAX_DELAY-1 //-1 for not infinite timeout in i2c
 
 #define MPU6050_SIZE_SAMPLE_BUFFER 100
 

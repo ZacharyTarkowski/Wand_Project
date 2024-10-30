@@ -17,7 +17,7 @@
 #define RING_BUFFER_MAX_SIZE 512
 
 //#define RING_BUFFER_ERROR_TYPE HAL_StatusTypeDef
-#define buffer_element float
+#define buffer_element int32_t
 
 #if 0
 #define ringBufPrint ("%f.2, ")

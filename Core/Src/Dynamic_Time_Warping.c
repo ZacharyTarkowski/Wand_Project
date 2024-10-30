@@ -10,6 +10,13 @@ HAL_StatusTypeDef dtw_init()
 {
     g_dtw_settings = dtw_settings_default();
     dtw = (seq_t *)malloc(sizeof(seq_t) * RING_BUFFER_MAX_SIZE * 2);
+    
+    
+    single_dtw_buf = malloc(RING_BUFFER_MAX_SIZE * sizeof(u32*));
+    for(u32 i = 0; i< RING_BUFFER_MAX_SIZE; i++)
+    {
+        single_dtw_buf[i] = malloc(RING_BUFFER_MAX_SIZE * sizeof(u32));
+    }
 
     return HAL_OK;
 }
@@ -17,6 +24,30 @@ HAL_StatusTypeDef dtw_init()
 void free_dtw_buf()
 {
     //free dtw buffer after preallocated
+}
+
+u32 dtw_single(buffer_element *s, buffer_element *t, u32 n, u32 m) {
+    
+    u32 i, j;
+
+    for(i = 0; i <= n; i++) {
+        for(j = 0; j <= m; j++) {
+            if (i == 0 && j == 0) {
+                single_dtw_buf[i][j] = 0;
+            } else if (i == 0) {
+                single_dtw_buf[i][j] = 0xFFFFFFFF;
+            } else if (j == 0) {
+                single_dtw_buf[i][j] = 0xFFFFFFFF;
+            } else {
+                u32 cost = abs(s[i - 1] - t[j - 1]);
+                single_dtw_buf[i][j] = cost + MIN(MIN(single_dtw_buf[i - 1][j], single_dtw_buf[i][j - 1]), single_dtw_buf[i - 1][j - 1]);
+            }
+        }
+    }
+
+    u32 distance = single_dtw_buf[n][m];
+
+    return distance;
 }
 
 DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t)
@@ -31,7 +62,7 @@ DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t)
     result.y_gyro_result  = dtw_distance(      s->buffer[4],     s->write_index,        t->buffer[4],    t->write_index, &g_dtw_settings) ;
     result.z_gyro_result  = dtw_distance(      s->buffer[5],     s->write_index,        t->buffer[5],    t->write_index, &g_dtw_settings) ;
     u32 endTime = HAL_GetTick();
-    uart_println("DTW time : %d", endTime - startTime);
+    uart_println("DTW time : %d %d %d", endTime - startTime, s->write_index, t->write_index);
     return result;
 }
 

@@ -47,6 +47,7 @@ volatile u8 timer_flag = 0;
 ring_buffer_s ring_buffer_1;
 ring_buffer_s ring_buffer_2;
 ring_buffer_s ring_buffer_3;
+ring_buffer_s ring_buffer_4;
 ring_buffer_s circle_spell_ring_buffer;
 ring_buffer_s line_spell_ring_buffer;
 
@@ -132,6 +133,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 #define FREQ   10.0
 #define PERIOD (float)1/FREQ
+#define ALPHA 0.05
 
 /* USER CODE END 0 */
 
@@ -178,6 +180,7 @@ int main(void)
   status |= ring_buffer_init(&ring_buffer_1, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
 	status |= ring_buffer_init(&ring_buffer_2, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_2_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
 	status |= ring_buffer_init(&ring_buffer_3, ring_3_initial_data,sizeof(ring_3_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_3_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
+  status |= ring_buffer_init(&ring_buffer_4, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
   
 
 	status |= dtw_init();
@@ -205,6 +208,7 @@ int main(void)
 	timer_flag = 0;
 
 	WAND_STATE state = IDLE;
+  WAND_STATE next_state = CAPTURE_1;
 	u8 MPU6050_hard_reset_flag = 0;
 
 	set_led_color(LED_COLOR_RED);
@@ -217,16 +221,22 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-	float integral_x_accel = 0;
-  float integral_y_accel = 0;
-  float integral_z_accel = 0;
-  float integral_x_gyro  = 0;
-  float integral_y_gyro  = 0;
-  float integral_z_gyro  = 0;
 
-  float integral_x_angle  = 0;
-  float integral_y_angle  = 0;
-  float integral_z_angle  = 0;
+  volatile float integral_pitch  = 0;
+  volatile float integral_roll   = 0;
+  volatile float integral_yaw    = 0;
+
+  volatile float pitch_accel = 0;
+  volatile float roll_accel  = 0;
+
+  float pitch_accel_1 = 0;
+  float roll_accel_1  = 0;
+
+  float pitch_accel_2 = 0;
+  float roll_accel_2  = 0;
+
+  volatile float pitch_accel_deg = 0;
+  volatile float roll_accel_deg  = 0;
 
 	while (1)
 	{
@@ -245,18 +255,18 @@ int main(void)
 			if(capture_flag)
 			{
 				first_run = 1;
-				state = CAPTURE_1;
+				state = next_state;
 			}
-      else if(timer_flag && 0)
+      else if(timer_flag && 1)
 			{
 				timer_flag = 0;
 				if(first_run)
 				{
 					first_run = 0;
-					data_ready_flag = 0;
-					ring_buffer_clear(&ring_buffer_3);
-					status = MPU6050_reset_fifo_(pMPU6050);
 					
+					ring_buffer_clear(&ring_buffer_4);
+					status = MPU6050_reset_fifo_(pMPU6050);
+					data_ready_flag = 0;
 					
 					if(status != HAL_OK)
 					{
@@ -269,9 +279,8 @@ int main(void)
 				if(data_ready_flag && !MPU6050_hard_reset_flag)
 				{
 					data_ready_flag = 0;
-					first_run = 1;
 
-					status = ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_3 );
+					status = ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_4 );
 					if(status != HAL_OK)
 					{
 						uart_println("Read and store failed");
@@ -279,37 +288,52 @@ int main(void)
 						
 					}
 
-					//ring_buffer_print_to_write_index(&ring_buffer_3);
+					//ring_buffer_print_to_write_index(&ring_buffer_4);
 
-					float x_mps2 = (float)(ring_buffer_3.buffer[0][0])  / 16384.0 ; 
-					float y_mps2 = (float)(ring_buffer_3.buffer[1][0])  / 16384.0;
-					float z_mps2 = (float)(ring_buffer_3.buffer[2][0])  / 16384.0;
-					float x_dps  = (float)(ring_buffer_3.buffer[3][0])  / 16384.0 ;
-					float y_dps  = (float)(ring_buffer_3.buffer[4][0])  / 16384.0 ;
-					float z_dps  = (float)(ring_buffer_3.buffer[5][0])  / 16384.0 ;
+					volatile float x_mps2 = (float)(ring_buffer_4.buffer[0][ring_buffer_4.write_index-1])  / 16384.0; 
+					volatile float y_mps2 = (float)(ring_buffer_4.buffer[1][ring_buffer_4.write_index-1])  / 16384.0;
+					volatile float z_mps2 = (float)(ring_buffer_4.buffer[2][ring_buffer_4.write_index-1])  / 16384.0;
+
+					volatile float x_dps  = (float)(ring_buffer_4.buffer[3][ring_buffer_4.write_index-1])  / 131.0;
+					volatile float y_dps  = (float)(ring_buffer_4.buffer[4][ring_buffer_4.write_index-1])  / 131.0;
+					volatile float z_dps  = (float)(ring_buffer_4.buffer[5][ring_buffer_4.write_index-1])  / 131.0;
 
 					x_mps2 = x_mps2 * 9.81;
 					y_mps2 = y_mps2 * 9.81;
 					z_mps2 = z_mps2 * 9.81;
 
-					//uart_println("%f,%f,%f,%f,%f,%f",x_mps2,y_mps2,z_mps2,x_dps,y_dps,z_dps);
+          // x_dps  = x_dps * 250.0;
+          // y_dps  = y_dps * 250.0;
+          // z_dps  = z_dps * 250.0;
 
-					
+          volatile float x_rps = x_dps * (3.14/180);
+          volatile float y_rps = y_dps * (3.14/180);
+          volatile float z_rps = z_dps * (3.14/180);
+				
 
-					float x_angle_accel = atanf(x_mps2 / (sqrt(y_mps2*y_mps2 + z_mps2*z_mps2))) ;
-					float y_angle_accel = atanf(y_mps2 / (sqrt(x_mps2*x_mps2 + z_mps2*z_mps2)))  ;
-					float z_angle_accel = atanf((sqrt(x_mps2*x_mps2 + y_mps2*y_mps2)) / z_mps2) ;
+					roll_accel = atan2f(x_mps2 , (sqrt(y_mps2*y_mps2 + z_mps2*z_mps2))   ) ;
+					pitch_accel = atan2f(y_mps2 , (sqrt(x_mps2*x_mps2 + z_mps2*z_mps2))    )  ;
 
-          integral_x_angle = integral_x_angle + PERIOD * x_dps; 
-					integral_y_angle = integral_y_angle + PERIOD * y_dps; 
-					integral_z_angle = integral_z_angle + PERIOD * z_dps; 
-					
+          // volatile float pitch_gyro = x_rps + tanf(integral_roll) * sinf(integral_roll) * y_rps + cosf(integral_roll) * z_rps;
+          // volatile float roll_gyro  = cosf(integral_roll) * y_rps - sinf(integral_roll) * z_rps;
 
-          	uart_println("%f,%f,%f,",
-						integral_x_angle* (180.0/3.14) ,
-						integral_y_angle* (180.0/3.14) ,
-						integral_z_angle* (180.0/3.14) 
-						);
+          // integral_pitch = integral_pitch + PERIOD * pitch_gyro; 
+					// integral_roll  = integral_roll  + PERIOD * roll_gyro; 
+					// //integral_yaw   = integral_yaw   + PERIOD * z_dps; 
+
+          // volatile float pitch_comp = ALPHA * pitch_accel + (1.0-ALPHA) * integral_pitch;
+          // volatile float roll_comp  = ALPHA * roll_accel + (1.0-ALPHA) * integral_roll;
+
+
+          // uart_println("%f,%f,%f,",
+          // integral_pitch * (180.0/3.14),
+          // integral_roll * (180.0/3.14),
+          // integral_yaw  
+          // );
+
+          pitch_accel_deg = pitch_accel * (180.0/3.14);
+          roll_accel_deg = roll_accel * (180.0/3.14);
+          //uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel_deg, roll_accel_deg );
 					
 					
 
@@ -338,6 +362,19 @@ int main(void)
 						uart_println("Failed to reset FIFO!");
 						MPU6050_hard_reset_flag = 1;
 					}
+
+          if(state == CAPTURE_1)
+          {
+            pitch_accel_1 = pitch_accel;
+            roll_accel_1 = roll_accel;
+            next_state = CAPTURE_2;
+          }
+          else if (state == CAPTURE_2)
+          {
+            pitch_accel_2 = pitch_accel;
+            roll_accel_2 = roll_accel;
+            next_state = PRINT_AND_COMPARE;
+          }
 				}
 
 				if(data_ready_flag && !MPU6050_hard_reset_flag)
@@ -360,8 +397,10 @@ int main(void)
 				{
 					uart_println("Done Capturing %d",state);
 
-					state = COMPARE_STATIC; 
-					//state = state == CAPTURE_1 ? CAPTURE_2 : PRINT_AND_COMPARE;
+					//state = COMPARE_STATIC; 
+					//state = state == CAPTURE_2 ? PRINT_AND_COMPARE : IDLE;
+          state = IDLE;
+          
 					first_run = 1;
 				}
 			}
@@ -377,6 +416,28 @@ int main(void)
 				ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_2);
 				//ring_buffer_print_to_write_index(&ring_buffer_2);
 
+        uart_println("Angle estimates 1 : Pitch %f, Roll %f", pitch_accel_1 * (180.0/3.14), roll_accel_1* (180.0/3.14));
+        uart_println("Angle estimates 2 : Pitch %f, Roll %f", pitch_accel_2* (180.0/3.14), roll_accel_2* (180.0/3.14) );
+
+        uart_println("DTW pre rotation");
+        result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
+				print_dtw_result(&result);
+
+        //un-rotate with inverse rotation matrix for roll angle
+        for(u32 i = 0; i< ring_buffer_1.write_index; i++)
+        {
+          buffer_element temp = ring_buffer_1.buffer[0][i] * cosf(roll_accel) - ring_buffer_1.buffer[2][i] * sinf(roll_accel);
+          ring_buffer_1.buffer[2][i] = ring_buffer_1.buffer[2][i] * cosf(roll_accel) + ring_buffer_1.buffer[0][i] * sinf(roll_accel);
+          ring_buffer_1.buffer[0][i] = temp;
+        }
+
+        for(u32 i = 0; i< ring_buffer_2.write_index; i++)
+        {
+          buffer_element temp = ring_buffer_2.buffer[0][i] * cosf(roll_accel) - ring_buffer_2.buffer[2][i] * sinf(roll_accel);
+          ring_buffer_2.buffer[2][i] = ring_buffer_2.buffer[2][i] * cosf(roll_accel) + ring_buffer_2.buffer[0][i] * sinf(roll_accel);
+          ring_buffer_2.buffer[0][i] = temp;
+        }
+
 				result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
 				print_dtw_result(&result);
 
@@ -384,6 +445,8 @@ int main(void)
 				ring_buffer_clear(&ring_buffer_1);
 				ring_buffer_clear(&ring_buffer_2);
 				state = IDLE;
+        next_state = CAPTURE_1;
+        capture_flag = 0;
 
 
 			break;
@@ -395,6 +458,18 @@ int main(void)
         ring_buffer_print_to_write_index(&ring_buffer_1);
 
         uart_println("Circle DTW");
+        uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel_deg, roll_accel_deg );
+        result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
+				print_dtw_result(&result);
+
+        for(u32 i = 0; i< ring_buffer_1.write_index; i++)
+        {
+          buffer_element temp = ring_buffer_1.buffer[0][i] * cosf(roll_accel) + ring_buffer_1.buffer[2][i] * sinf(roll_accel);
+          ring_buffer_1.buffer[2][i] = ring_buffer_1.buffer[2][i] * cosf(roll_accel) - ring_buffer_1.buffer[0][i] * sinf(roll_accel);
+          ring_buffer_1.buffer[0][i] = temp;
+        }
+
+        ring_buffer_print_to_write_index(&ring_buffer_1);
         result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
 				print_dtw_result(&result);
 

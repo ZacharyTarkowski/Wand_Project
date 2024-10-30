@@ -97,6 +97,7 @@ const reg reg_name_list[256] =
 		{ MPU6050_REG_ADDR_I2C_SLV1_DO , "I2C_SLV1_DO"},
 		{ MPU6050_REG_ADDR_I2C_SLV2_DO , "I2C_SLV2_DO"},
 		{ MPU6050_REG_ADDR_I2C_SLV3_DO , "I2C_SLV3_DO"},
+		{ MPU6050_REG_ADDR_USER_CTRL , "USER_CTRL"},
 		{ MPU6050_REG_ADDR_PWR_MGMT_1 , "PWR_MGMT_1"},
 		{ MPU6050_REG_ADDR_PWR_MGMT_2 , "PWR_MGMT_2"},
 		{ MPU6050_REG_ADDR_FIFO_COUNTH , "FIFO_COUNTH"},
@@ -318,13 +319,16 @@ HAL_StatusTypeDef MPU6050_get_fifo_data(Mpu_6050_handle_s* handle, u8* num_sampl
 	{
 		status = HAL_I2C_Master_Transmit(handle->i2c_handle, (handle->i2c_address << 1) | 0x00, &address, 1, MPU6050_TIMEOUT);
 		status |= HAL_I2C_Master_Receive(handle->i2c_handle, (handle->i2c_address << 1) | 0x01, g_fifo_read_buffer, fifo_count_full, MPU6050_TIMEOUT);
+
+		if(status == HAL_OK)
+		{
+			//put data into struct
+			*num_samples = fifo_count_full / sizeof(Mpu_6050_data_s);
+		}
 	}
-
-	if(status == HAL_OK)
+	else if(status == HAL_OK && fifo_count_full == 0)
 	{
-//put data into struct
-		*num_samples = fifo_count_full / sizeof(Mpu_6050_data_s);
-
+		status = HAL_OK;
 	}
 
 	return status;

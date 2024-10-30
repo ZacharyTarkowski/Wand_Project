@@ -108,6 +108,10 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* han
 			ring_buffer_write_element(pRingBuffer, &tmpBuf);
 		}
 	}
+	else
+	{
+		uart_println("Breakpoint");
+	}
 
 	//fixme
 	return status;
