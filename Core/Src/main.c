@@ -35,7 +35,7 @@
 #include "Static_Spells.h"
 #include "Wand_Utils.h"
 
-
+#define RAD_TO_DEG (180.0/3.14)
 
 Mpu_6050_handle_s MPU6050_handle;
 Mpu_6050_handle_s* pMPU6050 = &MPU6050_handle;
@@ -238,6 +238,18 @@ int main(void)
   volatile float pitch_accel_deg = 0;
   volatile float roll_accel_deg  = 0;
 
+  volatile float x_rps = 0;
+  volatile float y_rps = 0;
+  volatile float z_rps = 0;
+
+  float x_mps2_1 = 0;
+  float y_mps2_1 = 0;
+  float z_mps2_1 = 0;
+
+  float x_mps2_2 = 0;
+  float y_mps2_2 = 0;
+  float z_mps2_2 = 0;
+
 	while (1)
 	{
     /* USER CODE END WHILE */
@@ -298,17 +310,17 @@ int main(void)
 					volatile float y_dps  = (float)(ring_buffer_4.buffer[4][ring_buffer_4.write_index-1])  / 131.0;
 					volatile float z_dps  = (float)(ring_buffer_4.buffer[5][ring_buffer_4.write_index-1])  / 131.0;
 
-					x_mps2 = x_mps2 * 9.81;
-					y_mps2 = y_mps2 * 9.81;
-					z_mps2 = z_mps2 * 9.81;
+					// x_mps2 = x_mps2 * 9.81;
+					// y_mps2 = y_mps2 * 9.81;
+					// z_mps2 = z_mps2 * 9.81;
 
           // x_dps  = x_dps * 250.0;
           // y_dps  = y_dps * 250.0;
           // z_dps  = z_dps * 250.0;
 
-          volatile float x_rps = x_dps * (3.14/180);
-          volatile float y_rps = y_dps * (3.14/180);
-          volatile float z_rps = z_dps * (3.14/180);
+          x_rps = x_dps * (3.14/180);
+          y_rps = y_dps * (3.14/180);
+          z_rps = z_dps * (3.14/180);
 				
 
 					roll_accel = atan2f(x_mps2 , (sqrt(y_mps2*y_mps2 + z_mps2*z_mps2))   ) ;
@@ -330,6 +342,7 @@ int main(void)
           // integral_roll * (180.0/3.14),
           // integral_yaw  
           // );
+
 
           pitch_accel_deg = pitch_accel * (180.0/3.14);
           roll_accel_deg = roll_accel * (180.0/3.14);
@@ -367,12 +380,18 @@ int main(void)
           {
             pitch_accel_1 = pitch_accel;
             roll_accel_1 = roll_accel;
+            x_mps2_1 = x_rps;
+            y_mps2_1 = y_rps;
+            z_mps2_1 = z_rps;
             next_state = CAPTURE_2;
           }
           else if (state == CAPTURE_2)
           {
             pitch_accel_2 = pitch_accel;
             roll_accel_2 = roll_accel;
+            x_mps2_2 = x_rps;
+            y_mps2_2 = y_rps;
+            z_mps2_2 = z_rps;
             next_state = PRINT_AND_COMPARE;
           }
 				}
@@ -419,25 +438,37 @@ int main(void)
         uart_println("Angle estimates 1 : Pitch %f, Roll %f", pitch_accel_1 * (180.0/3.14), roll_accel_1* (180.0/3.14));
         uart_println("Angle estimates 2 : Pitch %f, Roll %f", pitch_accel_2* (180.0/3.14), roll_accel_2* (180.0/3.14) );
 
+        float mag_1 = sqrt(x_mps2_1 * x_mps2_1 + y_mps2_1 * y_mps2_1 + z_mps2_1 * z_mps2_1);
+        float mag_2 = sqrt(x_mps2_2 * x_mps2_2 + y_mps2_2 * y_mps2_2 + z_mps2_2 * z_mps2_2);
+
+        float numerator = x_mps2_1*x_mps2_2 + y_mps2_1*y_mps2_2 + z_mps2_1*z_mps2_2;
+        float angle_1_2 = acos(  numerator  / (mag_1 * mag_2) ) ;
+
+        uart_println("%f %f %f %f %f %f",x_mps2_1,y_mps2_1,z_mps2_1,x_mps2_2,y_mps2_2,z_mps2_2);
+
+        uart_println("Angle 1-2 is : %f", angle_1_2 * RAD_TO_DEG );
+        
+
         uart_println("DTW pre rotation");
         result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
 				print_dtw_result(&result);
 
         //un-rotate with inverse rotation matrix for roll angle
-        for(u32 i = 0; i< ring_buffer_1.write_index; i++)
-        {
-          buffer_element temp = ring_buffer_1.buffer[0][i] * cosf(roll_accel) - ring_buffer_1.buffer[2][i] * sinf(roll_accel);
-          ring_buffer_1.buffer[2][i] = ring_buffer_1.buffer[2][i] * cosf(roll_accel) + ring_buffer_1.buffer[0][i] * sinf(roll_accel);
-          ring_buffer_1.buffer[0][i] = temp;
-        }
+        // for(u32 i = 0; i< ring_buffer_1.write_index; i++)
+        // {
+        //   buffer_element temp = ring_buffer_1.buffer[0][i] * cosf(roll_accel_1) - ring_buffer_1.buffer[2][i] * sinf(roll_accel_1);
+        //   ring_buffer_1.buffer[2][i] = ring_buffer_1.buffer[2][i] * cosf(roll_accel_1) + ring_buffer_1.buffer[0][i] * sinf(roll_accel_1);
+        //   ring_buffer_1.buffer[0][i] = temp;
+        // }
 
-        for(u32 i = 0; i< ring_buffer_2.write_index; i++)
-        {
-          buffer_element temp = ring_buffer_2.buffer[0][i] * cosf(roll_accel) - ring_buffer_2.buffer[2][i] * sinf(roll_accel);
-          ring_buffer_2.buffer[2][i] = ring_buffer_2.buffer[2][i] * cosf(roll_accel) + ring_buffer_2.buffer[0][i] * sinf(roll_accel);
-          ring_buffer_2.buffer[0][i] = temp;
-        }
+        // for(u32 i = 0; i< ring_buffer_2.write_index; i++)
+        // {
+        //   buffer_element temp = ring_buffer_2.buffer[0][i] * cosf(roll_accel_2) - ring_buffer_2.buffer[2][i] * sinf(roll_accel_2);
+        //   ring_buffer_2.buffer[2][i] = ring_buffer_2.buffer[2][i] * cosf(roll_accel_2) + ring_buffer_2.buffer[0][i] * sinf(roll_accel_2);
+        //   ring_buffer_2.buffer[0][i] = temp;
+        // }
 
+        uart_println("DTW post rotation");
 				result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
 				print_dtw_result(&result);
 
