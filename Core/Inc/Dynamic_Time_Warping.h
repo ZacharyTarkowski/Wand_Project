@@ -1,47 +1,29 @@
 #ifndef H_DYNAMIC_TIME_WARPING
 #define H_DYNAMIC_TIME_WARPING
 
+#include "General_Utils.h"
 #include "Ring_Buffer.h"
+#include "dd_dtw.h"
+
 #include <stdlib.h>
 
-#define MIN(a,b) ((a) < (b)  ? (a) : (b) )
-
-#define MAX_INT 0xFFFFFFFFFF
-
-#define DTW_LENGTH RING_BUFFER_SIZE * RING_BUFFER_SIZE * MPU_6050_NUM_DIMS
-
-//static u32 dtw_buf[MPU_6050_NUM_DIMS][RING_BUFFER_MAX_SIZE][RING_BUFFER_MAX_SIZE];
+//#define MIN(a,b) ((a) < (b)  ? (a) : (b) )
 
 typedef struct DTW_Result
 {
-    s32 x_accel_result;
-    s32 y_accel_result;
-    s32 z_accel_result;
-    s32 x_gyro_result;
-    s32 y_gyro_result;
-    s32 z_gyro_result;
+    int32_t x_accel_result;
+    int32_t y_accel_result;
+    int32_t z_accel_result;
+    int32_t x_gyro_result;
+    int32_t y_gyro_result;
+    int32_t z_gyro_result;
 } DTW_Result;
 
-typedef struct dtw_array_data
-{
-    u32 x_accel_value;
-    u32 y_accel_value;
-    u32 z_accel_value;
 
-    u32 x_gyro_value;
-    u32 y_gyro_value;
-    u32 z_gyro_value;
-
-} dtw_array_data;
-
-typedef enum {
-    SINGLE_MODE, //single, sequential dtw
-    MULTI_MODE //not true multithreaded
-} DTW_MODE;
-
-HAL_StatusTypeDef dtw_init(DTW_MODE mode);
-DTW_Result DTW_Distance( buffer_element* s, buffer_element* t, u32 s_length, u32 t_length);
-void free_dtw_buf(DTW_MODE mode);
+HAL_StatusTypeDef dtw_init();
+DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t);
+void print_dtw_result(DTW_Result* data);
+void free_dtw_buf();
 
 
 

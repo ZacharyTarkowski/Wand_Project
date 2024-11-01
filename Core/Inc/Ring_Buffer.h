@@ -14,10 +14,16 @@
 #include "MPU_6050_Utils.h"
 
 //put this in a user config
-#define RING_BUFFER_MAX_SIZE 1024
+#define RING_BUFFER_MAX_SIZE 512
 
 //#define RING_BUFFER_ERROR_TYPE HAL_StatusTypeDef
-#define buffer_element Mpu_6050_data_s
+#define buffer_element int32_t
+
+#if 0
+#define ringBufPrint ("%f.2, ")
+#else
+#define ringBufPrint ("%d, ")
+#endif
 
 typedef enum 
 {
@@ -41,9 +47,10 @@ typedef enum
 
 typedef struct ring_buffer_s
 {
-    buffer_element* buffer;
+    buffer_element** buffer;
     u32 write_index;
-    u32 size;
+    u32 num_dims;
+    u32 dim_size;
     void (*print_function)(buffer_element* pData);
 } ring_buffer_s;
 
@@ -59,7 +66,7 @@ typedef struct ring_buffer_s
 static void (*ring_buffer_print_function)(buffer_element* pData);
 
 
-RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, u32 size);
+RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, buffer_element* initialData, u32 initial_data_size, u32 num_dims, u32 dim_size);
 
 RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buffer_element* data);
 RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 index, buffer_element* data);

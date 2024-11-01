@@ -3,28 +3,77 @@
  *
  *  Created on: Sep 16, 2024
  *      Author: zacht
+ * 
+ * Iteratively good and bad ideas for data movement.
+ * Archive of attempts:
+ * Attempt 1:
+ * 	Buffer elements were structs. Ring buffers were structs with a malloc'd pointer to the buffer element struct.
+ * 
+ * Attempt 2:
+ * 	This attempt will be basically making each ring buffer a 2d matrix, malloc'd on init.
+ * 
+ * 
+ * 
+ * 
  */
 #include "Ring_Buffer.h"
 
-//buffer_element* ring_buffer[2];
-//u32 write_index[2];
-
-RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, u32 size)
+RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, buffer_element* initialData, u32 initial_data_size, u32 num_dims, u32 dim_size)
 {
-	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_SUCCESS;
+	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
 
-	pRingBuffer->buffer = malloc(size * sizeof(buffer_element));
-	
+	if(num_dims != 0 && dim_size != 0)
+	{
+		pRingBuffer->num_dims = num_dims;
+		pRingBuffer->dim_size = dim_size;
+		pRingBuffer->write_index = 0;
+
+		pRingBuffer->print_function = &MPU6050_print_data;
+		status = RING_BUFFER_SUCCESS;
+
+	}
+
+	if(status == RING_BUFFER_SUCCESS )
+	{
+		pRingBuffer->buffer = malloc(num_dims * sizeof(buffer_element*));
+	}
+
 	if(pRingBuffer->buffer == 0)
 	{
-		uart_println("Failed ring buffer init!");
 		status = RING_BUFFER_FAIL;
 	}
-	else
+
+	if(status == RING_BUFFER_SUCCESS )
 	{
-		pRingBuffer->print_function = &MPU6050_print_data;
-		pRingBuffer->size = size;
-		pRingBuffer->write_index = 0;
+		for(u32 i = 0; i< num_dims; i++)
+		{
+			pRingBuffer->buffer[i] = malloc(dim_size * sizeof(buffer_element));
+
+			if(pRingBuffer->buffer[i] == 0)
+			{
+				status = RING_BUFFER_FAIL;
+			}
+		}
+	}
+
+	if(status == RING_BUFFER_SUCCESS && initialData != 0)
+	{
+		pRingBuffer->write_index = (initial_data_size / num_dims) / sizeof(buffer_element);
+
+		for(u32 i = 0; i< pRingBuffer->write_index; i++)
+		{
+			for(u32 j = 0; j< pRingBuffer->num_dims; j++)
+			{
+				pRingBuffer->buffer[j][i] = initialData[(i*num_dims) + j];
+			}		
+		}
+	
+	}
+
+	if(status != HAL_OK)
+	{
+		uart_println("Failed ring buffer init!");
+		ring_buffer_destroy(pRingBuffer);
 	}
 
 	return status;
@@ -38,6 +87,8 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* han
 
 	Mpu_6050_data_s tmp_data;
 
+	buffer_element tmpBuf[pRingBuffer->num_dims];
+
 	status = MPU6050_get_fifo_data(handle, &num_samples);
 
 	if(status == HAL_OK)
@@ -46,23 +97,40 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* han
 		{
 			memset(&tmp_data,0,sizeof(Mpu_6050_data_s));
 			MPU6050_read_fifo_data(i, &tmp_data);
-			ring_buffer_write_element(pRingBuffer, &tmp_data);
+
+			tmpBuf[0] = (buffer_element)tmp_data.x_accel_data;
+			tmpBuf[1] = (buffer_element)tmp_data.y_accel_data;
+			tmpBuf[2] = (buffer_element)tmp_data.z_accel_data;
+			tmpBuf[3] = (buffer_element)tmp_data.x_gyro_data;
+			tmpBuf[4] = (buffer_element)tmp_data.y_gyro_data;
+			tmpBuf[5] = (buffer_element)tmp_data.z_gyro_data;
+			
+			ring_buffer_write_element(pRingBuffer, &tmpBuf);
 		}
+	}
+	else
+	{
+		uart_println("Breakpoint");
 	}
 
 	//fixme
 	return status;
 }
 
+//call by using something like buffer_element[pRingBuffer->num_dims] = {1,2,3};
 RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buffer_element* data)
 {
 	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
 	
 	if(data !=0)
 	{
-		memcpy(&pRingBuffer->buffer[pRingBuffer->write_index++], data, sizeof(buffer_element));
+		for(u32 i = 0; i< pRingBuffer->num_dims; i++)
+		{
+			memcpy(&pRingBuffer->buffer[i][pRingBuffer->write_index], &data[i], sizeof(buffer_element));
+		}
+		pRingBuffer->write_index++;
 
-		if(pRingBuffer->write_index >= pRingBuffer->size)
+		if(pRingBuffer->write_index >= pRingBuffer->dim_size)
 		{
 			pRingBuffer->write_index = 0;
 			uart_println("ring buffer rollover");
@@ -82,9 +150,12 @@ RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 
 {
 	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
 
-	if(index < pRingBuffer->size)
+	if(index < pRingBuffer->dim_size)
 	{
-		*data = pRingBuffer->buffer[index];
+		for(u32 i = 0; i< pRingBuffer->num_dims; i++)
+		{
+			data[i] = pRingBuffer->buffer[i][index];
+		}
 		status = RING_BUFFER_SUCCESS;
 	}
 
@@ -93,64 +164,54 @@ RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 
 
 void ring_buffer_print_all_elements(ring_buffer_s* pRingBuffer)
 {
-	for(int i = 0; i< pRingBuffer->size; i++)
+	for(u32 i = 0; i< pRingBuffer->dim_size; i++)
 	{
-		//fixme
-		buffer_element data;
-		ring_buffer_read_element(pRingBuffer, i, &data);
-		pRingBuffer->print_function(&data);
+		for(u32 j = 0; j< pRingBuffer->num_dims; j++)
+		{
+			uart_printf(ringBufPrint,pRingBuffer->buffer[j][i]);
+		}
+		uart_println("");
 	}
+	
 }
 
 void ring_buffer_print_to_write_index(ring_buffer_s* pRingBuffer)
 {
-	for(int i = 0; i< pRingBuffer->write_index; i++)
+	for(u32 i = 0; i< pRingBuffer->write_index; i++)
 	{
-		//fixme
-		buffer_element data;
-		ring_buffer_read_element(pRingBuffer, i, &data);
-		pRingBuffer->print_function(&data);
+		for(u32 j = 0; j< pRingBuffer->num_dims; j++)
+		{
+			uart_printf(ringBufPrint,(int32_t)pRingBuffer->buffer[j][i]);
+		}
+		uart_println("");
 	}
+	
 }
 
 void ring_buffer_print_element(ring_buffer_s* pRingBuffer, u32 index)
 {
-	if(index < pRingBuffer->size)
+	for(u32 i = 0; i< pRingBuffer->num_dims; i++)
 	{
-		buffer_element data;
-		ring_buffer_read_element(pRingBuffer, index, &data);
-		pRingBuffer->print_function(&data);
+		uart_printf(ringBufPrint,pRingBuffer->buffer[i][index]);
 	}
+	uart_println("");
 }
 
 void ring_buffer_clear(ring_buffer_s* pRingBuffer)
 {
-	memset(pRingBuffer->buffer,0x0,pRingBuffer->size * sizeof(buffer_element));
+	for(u32 i = 0; i< pRingBuffer->num_dims; i++)
+	{
+		memset(pRingBuffer->buffer[i], 0x0, pRingBuffer->dim_size * sizeof(buffer_element));
+	}
 	pRingBuffer->write_index = 0;
 }
 
 void ring_buffer_destroy(ring_buffer_s* pRingBuffer)
 {
-	free(pRingBuffer->buffer);
-}
-
-RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_parse_data_buffer(ring_buffer_s* pRingBuffer, s16* data)
-{
-	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
-	if(data != 0)
+	for(u32 i = 0; i<pRingBuffer->num_dims; i++)
 	{
-		buffer_element tmp_data;
-		for(int i = 0; i< pRingBuffer->size; i++)
-		{
-			memset(&tmp_data,0,sizeof(buffer_element));
-			
-			MPU6050_utility_data_buffer_to_struct(&data[i*(MPU_6050_NUM_DIMS)], &tmp_data);
-
-			ring_buffer_write_element(pRingBuffer, &tmp_data);
-		}
-		status = RING_BUFFER_SUCCESS;
+		free(pRingBuffer->buffer[i]);
 	}
-	return status;
 }
 
 //todo add in the rest of the operations
@@ -203,54 +264,32 @@ void MPU6050_data_operation(Mpu_6050_data_s* a, Mpu_6050_data_s* b, operation_e 
 	}
 }
 
-
-void ring_buffer_MPU6050_apply_vector(ring_buffer_s* pRingBuffer, buffer_element* vector, operation_e operation)
-{
-	for(u32 i = 0; i< pRingBuffer->size; i++)
-	{
-		MPU6050_data_operation(&pRingBuffer->buffer[i], vector, SUB);
-	}
-}
-
 void ring_buffer_MPU6050_apply_mean_centering(ring_buffer_s* pRingBuffer)
 {
-	s32 mean_x_accel_data = 0;
-	s32 mean_y_accel_data = 0;
-	s32 mean_z_accel_data = 0;
-	s32 mean_x_gyro_data  = 0;
-	s32 mean_y_gyro_data  = 0;
-	s32 mean_z_gyro_data  = 0;
-
 	if(pRingBuffer->write_index != 0)
 	{
 		
+		buffer_element mean_buffer[pRingBuffer->num_dims];
+		memset(&mean_buffer, 0x0, pRingBuffer->num_dims * sizeof(buffer_element)); //fixme size
 
-		for(u32 i = 0; i<pRingBuffer->write_index; i++)
+		for(u32 i = 0; i< pRingBuffer->num_dims; i++)
 		{
-			mean_x_accel_data += (s32)pRingBuffer->buffer[i].x_accel_data;
-			mean_y_accel_data += (s32)pRingBuffer->buffer[i].y_accel_data;
-			mean_z_accel_data += (s32)pRingBuffer->buffer[i].z_accel_data;
-			mean_x_gyro_data  += (s32)pRingBuffer->buffer[i].x_gyro_data ;
-			mean_y_gyro_data  += (s32)pRingBuffer->buffer[i].y_gyro_data ;
-			mean_z_gyro_data  += (s32)pRingBuffer->buffer[i].z_gyro_data ;
+			for(u32 j = 0; j< pRingBuffer->write_index; j++)
+			{
+				mean_buffer[i] += (buffer_element)pRingBuffer->buffer[i][j];
+			}
+
+			mean_buffer[i] = mean_buffer[i] / (buffer_element)pRingBuffer->write_index;
 		}
 
-		mean_x_accel_data = mean_x_accel_data / (s32)pRingBuffer->write_index;
-		mean_y_accel_data = mean_y_accel_data / (s32)pRingBuffer->write_index;
-		mean_z_accel_data = mean_z_accel_data / (s32)pRingBuffer->write_index;
-		mean_x_gyro_data  = mean_x_gyro_data  / (s32)pRingBuffer->write_index;
-		mean_y_gyro_data  = mean_y_gyro_data  / (s32)pRingBuffer->write_index;
-		mean_z_gyro_data  = mean_z_gyro_data  / (s32)pRingBuffer->write_index;
-
-		for(u32 i = 0; i<pRingBuffer->write_index; i++)
+		for(u32 i = 0; i< pRingBuffer->num_dims; i++)
 		{
-			pRingBuffer->buffer[i].x_accel_data -= (s16)mean_x_accel_data;
-			pRingBuffer->buffer[i].y_accel_data -= (s16)mean_y_accel_data;
-			pRingBuffer->buffer[i].z_accel_data -= (s16)mean_z_accel_data;
-			pRingBuffer->buffer[i].x_gyro_data  -= (s16)mean_x_gyro_data  ;
-			pRingBuffer->buffer[i].y_gyro_data  -= (s16)mean_y_gyro_data  ;
-			pRingBuffer->buffer[i].z_gyro_data  -= (s16)mean_z_gyro_data  ;
+			for(u32 j = 0; j< pRingBuffer->write_index; j++)
+			{
+				pRingBuffer->buffer[i][j] -= (buffer_element)mean_buffer[i];
+			}
 		}
+		
 	}
 }
 

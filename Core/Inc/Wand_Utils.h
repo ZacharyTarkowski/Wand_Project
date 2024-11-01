@@ -1,0 +1,39 @@
+#ifndef H_WAND_UTILS
+#define H_WAND_UTILS
+
+
+#define DTW_THRESHOLD 6500
+
+typedef enum  {
+	IDLE,
+	CAPTURE_1,
+	CAPTURE_2,
+	PRINT_AND_COMPARE,
+	COMPARE_STATIC,
+	HARD_RESET,
+	MAX_WAND_STATE
+}WAND_STATE;
+
+const char* wand_state_name_lut[MAX_WAND_STATE] = {
+	"IDLE",
+	"CAPTURE_1",
+	"CAPTURE_2",
+	"PRINT_AND_COMPARE",
+	"COMPARE_STATIC",
+	"HARD_RESET",
+	"MAX_WAND_STATE"
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+#endif

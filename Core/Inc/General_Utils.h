@@ -35,6 +35,8 @@ typedef enum {
 #define s16 int16_t
 #define s32 int32_t
 
+typedef s32 dtw_seq_t;
+
 #define BAD_PRINT_STRING "Bad Print Call\n\r"
 
 void printstring(char* msg);
