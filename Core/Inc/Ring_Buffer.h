@@ -5,6 +5,17 @@
  *      Author: zacht
  */
 
+
+/*
+
+Todo:
+
+Buffer elements should not have to be the same as DTW elements, but thats how its done to be compatible with DTAI DTW.
+Fix is to do own DTW or fix dtai dtw
+
+
+*/
+
 #ifndef RING_BUFFER_H_
 #define RING_BUFFER_H_
 

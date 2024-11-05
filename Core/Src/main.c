@@ -34,26 +34,19 @@
 
 #include "Static_Spells.h"
 #include "Wand_Utils.h"
-
-
+#include "Orientation_Utils.h"
 
 Mpu_6050_handle_s MPU6050_handle;
 Mpu_6050_handle_s* pMPU6050 = &MPU6050_handle;
+
 volatile u8 data_ready_flag = 0;
 volatile u8 capture_flag = 0;
 volatile u32 capture_flag_valid_time;
 volatile u8 timer_flag = 0;
 
-ring_buffer_s ring_buffer_1;
-ring_buffer_s ring_buffer_2;
-ring_buffer_s ring_buffer_3;
-ring_buffer_s ring_buffer_4;
-ring_buffer_s circle_spell_ring_buffer;
-ring_buffer_s line_spell_ring_buffer;
-
-ring_buffer_s orientation_line_spell_ring_buffer;
-ring_buffer_s orientation_circle_spell_ring_buffer;
-
+ring_buffer_s ring_buffer_capture_1;
+ring_buffer_s ring_buffer_capture_2;
+ring_buffer_s ring_buffer_idle;
 
 /* USER CODE END Includes */
 
@@ -94,9 +87,6 @@ static void MX_TIM3_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-
-
-
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	u32 capture_flag_current_time;
@@ -130,10 +120,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		timer_flag = 1;
 	}
 }
-
-#define FREQ   10.0
-#define PERIOD (float)1/FREQ
-#define ALPHA 0.05
 
 /* USER CODE END 0 */
 
@@ -173,16 +159,21 @@ int main(void)
 	HAL_StatusTypeDef status = HAL_ERROR;
 	Mpu_6050_data_s data;
 	Mpu_6050_data_s* pData;
+
+  DTW_Result result;
+  WAND_STATE state = IDLE;
+  WAND_STATE next_state = CAPTURE_1;
 	
 	u8 sample_rate_divider = 10;
+	u8 first_run = 1;
+  u8 MPU6050_hard_reset_flag = 0;
+
+
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
-
-  status |= ring_buffer_init(&ring_buffer_1, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
-	status |= ring_buffer_init(&ring_buffer_2, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_2_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
-	status |= ring_buffer_init(&ring_buffer_3, ring_3_initial_data,sizeof(ring_3_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_3_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
-  status |= ring_buffer_init(&ring_buffer_4, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
+  status |= ring_buffer_init(&ring_buffer_capture_1, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
+	status |= ring_buffer_init(&ring_buffer_capture_2, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_2_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
+  status |= ring_buffer_init(&ring_buffer_idle, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
   
-
 	status |= dtw_init();
 
 	if(status != HAL_OK)
@@ -190,31 +181,12 @@ int main(void)
 		return -1;
 	}
 
-  //ring_buffer_print_to_write_index(&ring_buffer_2);
-  //ring_buffer_print_to_write_index(&ring_buffer_2);
-
-  DTW_Result result = DTW_Distance(&ring_buffer_2, &ring_buffer_3);
-  print_dtw_result(&result);
-
-
-	
-	u8 toggle = 0;
-	u8 first_run = 1;
-	u8 num_samples = 0;
-
 	capture_flag = 0;
 	timer_flag = 0;
 	data_ready_flag = 0;
 	timer_flag = 0;
-
-	WAND_STATE state = IDLE;
-  WAND_STATE next_state = CAPTURE_1;
-	u8 MPU6050_hard_reset_flag = 0;
-
-	set_led_color(LED_COLOR_RED);
-
-	//HAL_TIM_Base_Start(&htim3);
-	HAL_TIM_Base_Start_IT(&htim3);
+  set_led_color(LED_COLOR_RED);
+  HAL_TIM_Base_Start_IT(&htim3);
 
   /* USER CODE END 2 */
 
@@ -226,8 +198,8 @@ int main(void)
   volatile float integral_roll   = 0;
   volatile float integral_yaw    = 0;
 
-  volatile float pitch_accel = 0;
-  volatile float roll_accel  = 0;
+  float pitch_accel = 0;
+  float roll_accel  = 0;
 
   float pitch_accel_1 = 0;
   float roll_accel_1  = 0;
@@ -246,11 +218,6 @@ int main(void)
 
 		switch(state)
 		{
-			//this might get annoying
-			//nvm it literally never triggeres lol
-			//uart_println("State is : %s", wand_state_name_lut[state] );
-
-
 			case IDLE:
 			if(capture_flag)
 			{
@@ -264,7 +231,7 @@ int main(void)
 				{
 					first_run = 0;
 					
-					ring_buffer_clear(&ring_buffer_4);
+					ring_buffer_clear(&ring_buffer_idle);
 					status = MPU6050_reset_fifo_(pMPU6050);
 					data_ready_flag = 0;
 					
@@ -280,64 +247,19 @@ int main(void)
 				{
 					data_ready_flag = 0;
 
-					status = ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_4 );
+					status = ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_idle );
 					if(status != HAL_OK)
 					{
 						uart_println("Read and store failed");
 						MPU6050_hard_reset_flag = 1;
-						
 					}
 
-					//ring_buffer_print_to_write_index(&ring_buffer_4);
+          get_accel_angles(&ring_buffer_idle,&pitch_accel,&roll_accel);
+          uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
 
-					volatile float x_mps2 = (float)(ring_buffer_4.buffer[0][ring_buffer_4.write_index-1])  / 16384.0; 
-					volatile float y_mps2 = (float)(ring_buffer_4.buffer[1][ring_buffer_4.write_index-1])  / 16384.0;
-					volatile float z_mps2 = (float)(ring_buffer_4.buffer[2][ring_buffer_4.write_index-1])  / 16384.0;
+          //compfilter_tick(&ring_buffer_idle,&pitch_accel,&roll_accel);
+          //uart_println("Angle estimates : Pitch %f, Roll %f", RAD_TO_DEG(pitch_accel), RAD_TO_DEG(roll_accel));
 
-					volatile float x_dps  = (float)(ring_buffer_4.buffer[3][ring_buffer_4.write_index-1])  / 131.0;
-					volatile float y_dps  = (float)(ring_buffer_4.buffer[4][ring_buffer_4.write_index-1])  / 131.0;
-					volatile float z_dps  = (float)(ring_buffer_4.buffer[5][ring_buffer_4.write_index-1])  / 131.0;
-
-					x_mps2 = x_mps2 * 9.81;
-					y_mps2 = y_mps2 * 9.81;
-					z_mps2 = z_mps2 * 9.81;
-
-          // x_dps  = x_dps * 250.0;
-          // y_dps  = y_dps * 250.0;
-          // z_dps  = z_dps * 250.0;
-
-          volatile float x_rps = x_dps * (3.14/180);
-          volatile float y_rps = y_dps * (3.14/180);
-          volatile float z_rps = z_dps * (3.14/180);
-				
-
-					roll_accel = atan2f(x_mps2 , (sqrt(y_mps2*y_mps2 + z_mps2*z_mps2))   ) ;
-					pitch_accel = atan2f(y_mps2 , (sqrt(x_mps2*x_mps2 + z_mps2*z_mps2))    )  ;
-
-          // volatile float pitch_gyro = x_rps + tanf(integral_roll) * sinf(integral_roll) * y_rps + cosf(integral_roll) * z_rps;
-          // volatile float roll_gyro  = cosf(integral_roll) * y_rps - sinf(integral_roll) * z_rps;
-
-          // integral_pitch = integral_pitch + PERIOD * pitch_gyro; 
-					// integral_roll  = integral_roll  + PERIOD * roll_gyro; 
-					// //integral_yaw   = integral_yaw   + PERIOD * z_dps; 
-
-          // volatile float pitch_comp = ALPHA * pitch_accel + (1.0-ALPHA) * integral_pitch;
-          // volatile float roll_comp  = ALPHA * roll_accel + (1.0-ALPHA) * integral_roll;
-
-
-          // uart_println("%f,%f,%f,",
-          // integral_pitch * (180.0/3.14),
-          // integral_roll * (180.0/3.14),
-          // integral_yaw  
-          // );
-
-          pitch_accel_deg = pitch_accel * (180.0/3.14);
-          roll_accel_deg = roll_accel * (180.0/3.14);
-          //uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel_deg, roll_accel_deg );
-					
-					
-
-					
 				}
 			}
 			
@@ -379,10 +301,9 @@ int main(void)
 
 				if(data_ready_flag && !MPU6050_hard_reset_flag)
 				{
-					toggle = 1;
 					data_ready_flag = 0;
 
-					status = ring_buffer_MPU6050_read_and_store(pMPU6050, ( state==CAPTURE_1 ? &ring_buffer_1 : &ring_buffer_2 ) );
+					status = ring_buffer_MPU6050_read_and_store(pMPU6050, ( state==CAPTURE_1 ? &ring_buffer_capture_1 : &ring_buffer_capture_2 ) );
 					if(status != HAL_OK)
 					{
 						MPU6050_hard_reset_flag = 1;
@@ -409,41 +330,29 @@ int main(void)
 			case PRINT_AND_COMPARE:
 
 				uart_println("Ring Buffer 1");
-				ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_1);
-				//ring_buffer_print_to_write_index(&ring_buffer_1);
+				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_1);
+				ring_buffer_print_to_write_index(&ring_buffer_capture_1);
 
 				uart_println("Ring Buffer 2");
-				ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_2);
-				//ring_buffer_print_to_write_index(&ring_buffer_2);
+				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_2);
+				ring_buffer_print_to_write_index(&ring_buffer_capture_2);
 
-        uart_println("Angle estimates 1 : Pitch %f, Roll %f", pitch_accel_1 * (180.0/3.14), roll_accel_1* (180.0/3.14));
-        uart_println("Angle estimates 2 : Pitch %f, Roll %f", pitch_accel_2* (180.0/3.14), roll_accel_2* (180.0/3.14) );
+        uart_println("Angle estimates 1 : Pitch %f, Roll %f", pitch_accel_1, roll_accel_1);
+        uart_println("Angle estimates 2 : Pitch %f, Roll %f", pitch_accel_2, roll_accel_2 );
 
-        uart_println("DTW pre rotation");
-        result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
-				print_dtw_result(&result);
-
-        //un-rotate with inverse rotation matrix for roll angle
-        for(u32 i = 0; i< ring_buffer_1.write_index; i++)
-        {
-          buffer_element temp = ring_buffer_1.buffer[0][i] * cosf(roll_accel) - ring_buffer_1.buffer[2][i] * sinf(roll_accel);
-          ring_buffer_1.buffer[2][i] = ring_buffer_1.buffer[2][i] * cosf(roll_accel) + ring_buffer_1.buffer[0][i] * sinf(roll_accel);
-          ring_buffer_1.buffer[0][i] = temp;
-        }
-
-        for(u32 i = 0; i< ring_buffer_2.write_index; i++)
-        {
-          buffer_element temp = ring_buffer_2.buffer[0][i] * cosf(roll_accel) - ring_buffer_2.buffer[2][i] * sinf(roll_accel);
-          ring_buffer_2.buffer[2][i] = ring_buffer_2.buffer[2][i] * cosf(roll_accel) + ring_buffer_2.buffer[0][i] * sinf(roll_accel);
-          ring_buffer_2.buffer[0][i] = temp;
-        }
-
-				result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
-				print_dtw_result(&result);
+        // uart_println("DTW pre rotation");
+        // result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
+				// print_dtw_result(&result);
 
 
-				ring_buffer_clear(&ring_buffer_1);
-				ring_buffer_clear(&ring_buffer_2);
+				// result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
+				// print_dtw_result(&result);
+
+
+				ring_buffer_clear(&ring_buffer_capture_1);
+				ring_buffer_clear(&ring_buffer_capture_2);
+
+
 				state = IDLE;
         next_state = CAPTURE_1;
         capture_flag = 0;
@@ -454,26 +363,18 @@ int main(void)
 			case COMPARE_STATIC:
 				uart_println("Ring Buffer 1");
 				
-        ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_1);
-        ring_buffer_print_to_write_index(&ring_buffer_1);
+        ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_1);
+        //ring_buffer_print_to_write_index(&ring_buffer_1);
 
         uart_println("Circle DTW");
-        uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel_deg, roll_accel_deg );
-        result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
+        uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel_1, roll_accel_1 );
+
+        ring_buffer_print_to_write_index(&ring_buffer_capture_1);
+
+        result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
 				print_dtw_result(&result);
 
-        for(u32 i = 0; i< ring_buffer_1.write_index; i++)
-        {
-          buffer_element temp = ring_buffer_1.buffer[0][i] * cosf(roll_accel) + ring_buffer_1.buffer[2][i] * sinf(roll_accel);
-          ring_buffer_1.buffer[2][i] = ring_buffer_1.buffer[2][i] * cosf(roll_accel) - ring_buffer_1.buffer[0][i] * sinf(roll_accel);
-          ring_buffer_1.buffer[0][i] = temp;
-        }
-
-        ring_buffer_print_to_write_index(&ring_buffer_1);
-        result = DTW_Distance(&ring_buffer_1, &ring_buffer_2);
-				print_dtw_result(&result);
-
-        if(result.x_accel_result < DTW_THRESHOLD && result.z_accel_result < DTW_THRESHOLD)
+        if(result.x_accel_result < DTW_X_THRESHOLD && result.z_accel_result < DTW_Z_THRESHOLD)
         {
           set_led_color(LED_COLOR_GREEN);
         }
@@ -482,17 +383,12 @@ int main(void)
           set_led_color(LED_COLOR_RED);
         }
 
-        // uart_println("Second DTW");
-        // result = DTW_Distance(&ring_buffer_1, &ring_buffer_3);
-				// print_dtw_result(&result);
-
-				ring_buffer_clear(&ring_buffer_1);
+				ring_buffer_clear(&ring_buffer_capture_1);
 				state = IDLE;
 			break;
 
 			case HARD_RESET:
 				//hard reset
-				MPU6050_hard_reset_flag = 0;
 
 				uart_println("MPU6050 Hard Reset Needed");
 

@@ -42,6 +42,7 @@ Core/Src/Ring_Buffer.c \
 Core/Src/General_Utils.c \
 Core/Src/Dynamic_Time_Warping.c \
 Core/Src/LED_Utils.c \
+Core/Src/Orientation_Utils.c \
 Core/Src/dd_dtw.c \
 Core/Src/dd_ed.c \
 Core/Src/dd_globals.c \
