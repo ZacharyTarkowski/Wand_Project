@@ -255,10 +255,10 @@ int main(void)
 					}
 
           get_accel_angles(&ring_buffer_idle,&pitch_accel,&roll_accel);
-          uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
+          //uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
 
           //compfilter_tick(&ring_buffer_idle,&pitch_accel,&roll_accel);
-          //uart_println("Angle estimates : Pitch %f, Roll %f", RAD_TO_DEG(pitch_accel), RAD_TO_DEG(roll_accel));
+          //uart_println("Angle estimates comp : Pitch %f, Roll %f", pitch_accel, roll_accel);
 
 				}
 			}
@@ -331,22 +331,35 @@ int main(void)
 
 				uart_println("Ring Buffer 1");
 				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_1);
-				ring_buffer_print_to_write_index(&ring_buffer_capture_1);
+				//ring_buffer_print_to_write_index(&ring_buffer_capture_1);
 
 				uart_println("Ring Buffer 2");
 				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_2);
-				ring_buffer_print_to_write_index(&ring_buffer_capture_2);
+				//ring_buffer_print_to_write_index(&ring_buffer_capture_2);
 
         uart_println("Angle estimates 1 : Pitch %f, Roll %f", pitch_accel_1, roll_accel_1);
         uart_println("Angle estimates 2 : Pitch %f, Roll %f", pitch_accel_2, roll_accel_2 );
 
-        // uart_println("DTW pre rotation");
-        // result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
-				// print_dtw_result(&result);
+        uart_println("DTW pre rotation");
+        result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
+				print_dtw_result(&result);
 
+        ring_buffer_pitch_roll_rotation(&ring_buffer_capture_1,pitch_accel_1,roll_accel_1);
+        ring_buffer_pitch_roll_rotation(&ring_buffer_capture_2,pitch_accel_2,roll_accel_2);
 
-				// result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
-				// print_dtw_result(&result);
+        uart_println("Ring Buffer 1 Post Rotation");
+				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_1);
+				//ring_buffer_print_to_write_index(&ring_buffer_capture_1);
+
+        uart_println("Ring Buffer 2 Post Rotation");
+				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_2);
+				//ring_buffer_print_to_write_index(&ring_buffer_capture_2);
+
+        
+
+        uart_println("DTW Post rotation");
+				result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
+				print_dtw_result(&result);
 
 
 				ring_buffer_clear(&ring_buffer_capture_1);

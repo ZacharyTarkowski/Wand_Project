@@ -18,7 +18,7 @@ void get_accel_angles(ring_buffer_s* pRingBuffer,float* accel_pitch, float* acce
 
 float compfilter_tick(ring_buffer_s* pRingBuffer,float* comp_pitch, float* comp_roll);
 
-
+void ring_buffer_pitch_roll_rotation(ring_buffer_s* pRingBuffer, float theta, float phi);
 
 
 
