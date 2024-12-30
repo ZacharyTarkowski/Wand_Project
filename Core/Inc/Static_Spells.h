@@ -4,7 +4,7 @@
 #include "General_Utils.h"
 #include "Ring_Buffer.h"
 
-buffer_element ring_2_initial_data[] = 
+const buffer_element ring_2_initial_data[] = 
 {
  -650, 395, 361, -243, -99, 209,
 -432, 369, 397, -158, -244, 255,
@@ -247,7 +247,7 @@ buffer_element ring_2_initial_data[] =
 364, 1281, -603, -38, 282, 415
 };
 
-buffer_element ring_3_initial_data[] = {
+const buffer_element ring_3_initial_data[] = {
 304, 1018, 115, 38, -222, 634,
 570, 1062, 15, 241, -332, 674,
 648, 1134, -185, 425, -349, 645,

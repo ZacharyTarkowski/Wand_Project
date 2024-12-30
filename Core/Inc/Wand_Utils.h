@@ -2,7 +2,9 @@
 #define H_WAND_UTILS
 
 
-#define DTW_THRESHOLD 6500
+#define DTW_X_THRESHOLD 6500
+#define DTW_Y_THRESHOLD 6500
+#define DTW_Z_THRESHOLD 6500
 
 typedef enum  {
 	IDLE,
