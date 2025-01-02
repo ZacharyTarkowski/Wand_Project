@@ -426,6 +426,30 @@ HAL_StatusTypeDef MPU6050_get_raw_data(Mpu_6050_handle_s* handle, u8* buf)
 	return status;
 }
 
+//read the accelerometer data registers directly, using register fallthrough
+HAL_StatusTypeDef MPU6050_get_accel_sample(Mpu_6050_handle_s* handle, s16* buf)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+
+	//start at xout_h, read 6 registers from there using fallthrough
+	u8 start_address = MPU6050_REG_ADDR_MPU6050_XOUT_H;
+	u8 num_reg_to_read = 6;
+
+	u8 tmp_buf[num_reg_to_read];
+
+	status = HAL_I2C_Master_Transmit(handle->i2c_handle, (handle->i2c_address << 1) | 0x00, &start_address, 1, MPU6050_TIMEOUT);
+	status |= HAL_I2C_Master_Receive(handle->i2c_handle, (handle->i2c_address << 1) | 0x01, tmp_buf, num_reg_to_read, MPU6050_TIMEOUT);
+
+	//xout
+	buf[0] = (s16)((tmp_buf[0]<<8) |  tmp_buf[1]);
+	//yout
+	buf[1] = (s16)((tmp_buf[2]<<8) |  tmp_buf[3]);
+	//zout
+	buf[2] = (s16)((tmp_buf[4]<<8) |  tmp_buf[5]);
+
+	return status;
+}
+
 void MPU6050_print_data(Mpu_6050_data_s* pData)
 {
 

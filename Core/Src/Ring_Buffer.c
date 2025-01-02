@@ -117,6 +117,35 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* han
 	return status;
 }
 
+//fixme probably need this out of ring buffer source
+RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_get_accel_sample(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+	u8 num_samples = 0;
+
+	u16 tmp_buf[3];
+	buffer_element ring_tmp_buf[pRingBuffer->num_dims];
+
+	status = MPU6050_get_accel_sample(handle, tmp_buf);
+
+	if(status == HAL_OK)
+	{
+
+		ring_tmp_buf[0] = (buffer_element)tmp_buf[0];
+		ring_tmp_buf[1] = (buffer_element)tmp_buf[1];
+		ring_tmp_buf[2] = (buffer_element)tmp_buf[2];
+		
+		ring_buffer_write_element(pRingBuffer, &ring_tmp_buf);
+	}
+	else
+	{
+		uart_println("Breakpoint");
+	}
+
+	//fixme
+	return status;
+}
+
 //call by using something like buffer_element[pRingBuffer->num_dims] = {1,2,3};
 RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buffer_element* data)
 {
