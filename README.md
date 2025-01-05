@@ -1,18 +1,13 @@
 Wand Project
 
-Cast "spells" with accelerometer motion recognition using Dynamic Time Warping.
+Cast "spells" with accelerometer motion recognition using Dynamic Time Warping (DTW).
 
-Done on STM32F401RE, planning to do an actual board spin eventually.
+Done on STM32F401RE with the MPU6050 accelerometer, planning to do an actual board spin eventually.
 
-Very much a work in progress so far. 
+Current features:
+  Accelerometer based rotation cancellation : Accelerometer is periodically sampled to get the current orientation, which can then cancelled out (rotated by the negative angles of pitch and roll. Don't care about yaw). This effectively aligns the gravity vectors so that two accelerometer captures can be compared using DTW.
 
-  Hilights so far:
+  Dynamic Time Warping : Work in progress, but compares two buffers to generate a "measure" of how similar they are. Originally ripped the C backend out from the DTAIDTW python library for this, but am attempting to make my own using
   
-    General Utils, mostly uart printing nice to haves.
-    
-    MPU6050 Utils, driver for MPU6050 accelerometer/gyroscope
-    
-    Ring Buffer, rudimenary ring buffer implementation. Spells so far are stored in these ring buffers.
-    
-    Dynamic Time Warping, compares ring buffers to see how similar they are. 
+  Abdullah Mueen, Eamonn J. Keogh: Extracting Optimal Performance from Dynamic Time Warping. KDD 2016: 2129-2130 (https://www.cs.unm.edu/~mueen/DTW.pdf)
     
