@@ -25,7 +25,7 @@ Fix is to do own DTW or fix dtai dtw
 #include "MPU_6050_Utils.h"
 
 //put this in a user config
-#define RING_BUFFER_MAX_SIZE 512
+#define RING_BUFFER_MAX_SIZE 256
 
 //#define RING_BUFFER_ERROR_TYPE HAL_StatusTypeDef
 #define buffer_element int32_t

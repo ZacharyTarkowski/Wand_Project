@@ -170,8 +170,8 @@ int main(void)
 
 
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
-  status |= ring_buffer_init(&ring_buffer_capture_1, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
-	status |= ring_buffer_init(&ring_buffer_capture_2, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_2_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
+  status |= ring_buffer_init(&ring_buffer_capture_1, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_2_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
+	status |= ring_buffer_init(&ring_buffer_capture_2, ring_3_initial_data, sizeof(ring_3_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_3_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
   status |= ring_buffer_init(&ring_buffer_idle, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
   
 	status |= dtw_init();
@@ -209,6 +209,8 @@ int main(void)
 
   volatile float pitch_accel_deg = 0;
   volatile float roll_accel_deg  = 0;
+
+  DTW_Distance(&ring_buffer_capture_1 , &ring_buffer_capture_2);
 
 	while (1)
 	{

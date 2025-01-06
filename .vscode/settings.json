@@ -13,7 +13,10 @@
         "dd_ed.h": "c",
         "time.h": "c",
         "stdint.h": "c",
-        "orientation_utils.h": "c"
+        "orientation_utils.h": "c",
+        "signal.h": "c",
+        "stddef.h": "c",
+        "cmath": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }

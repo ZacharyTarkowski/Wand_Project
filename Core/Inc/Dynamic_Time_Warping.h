@@ -6,8 +6,9 @@
 #include "dd_dtw.h"
 
 #include <stdlib.h>
+#include <math.h>
 
-//#define MIN(a,b) ((a) < (b)  ? (a) : (b) )
+#define MIN(a,b) ((a) < (b)  ? (a) : (b) )
 
 typedef struct DTW_Result
 {
