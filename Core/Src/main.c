@@ -248,15 +248,16 @@ int main(void)
 				{
 					data_ready_flag = 0;
 
-					status = ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_idle );
+					status = ring_buffer_MPU6050_get_accel_sample(pMPU6050, &ring_buffer_idle);
 					if(status != HAL_OK)
 					{
 						uart_println("Read and store failed");
 						MPU6050_hard_reset_flag = 1;
 					}
 
+          //constantly doing angle calcs, dont need to do it that way...
           get_accel_angles(&ring_buffer_idle,&pitch_accel,&roll_accel);
-          //uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
+          uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
 
           //compfilter_tick(&ring_buffer_idle,&pitch_accel,&roll_accel);
           //uart_println("Angle estimates comp : Pitch %f, Roll %f", pitch_accel, roll_accel);

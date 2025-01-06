@@ -123,7 +123,7 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_get_accel_sample(Mpu_6050_handle_s* h
 	HAL_StatusTypeDef status = HAL_ERROR;
 	u8 num_samples = 0;
 
-	u16 tmp_buf[3];
+	s16 tmp_buf[3];
 	buffer_element ring_tmp_buf[pRingBuffer->num_dims];
 
 	status = MPU6050_get_accel_sample(handle, tmp_buf);
@@ -134,6 +134,11 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_get_accel_sample(Mpu_6050_handle_s* h
 		ring_tmp_buf[0] = (buffer_element)tmp_buf[0];
 		ring_tmp_buf[1] = (buffer_element)tmp_buf[1];
 		ring_tmp_buf[2] = (buffer_element)tmp_buf[2];
+
+		for(int i = 3; i< pRingBuffer->num_dims; i++)
+		{
+			ring_tmp_buf[i] = 0;
+		}
 		
 		ring_buffer_write_element(pRingBuffer, &ring_tmp_buf);
 	}

@@ -244,6 +244,7 @@ void MPU6050_print_data(Mpu_6050_data_s* pData);
 
 void MPU6050_read_fifo_data(u32 index, Mpu_6050_data_s* data);
 HAL_StatusTypeDef MPU6050_get_fifo_data(Mpu_6050_handle_s* handle, u8* num_samples);
+HAL_StatusTypeDef MPU6050_get_accel_sample(Mpu_6050_handle_s* handle, s16* buf);
 
 HAL_StatusTypeDef MPU6050_reset_fifo_(Mpu_6050_handle_s* handle);
 void MPU6050_utility_data_buffer_to_struct(s16* data, Mpu_6050_data_s* pData);

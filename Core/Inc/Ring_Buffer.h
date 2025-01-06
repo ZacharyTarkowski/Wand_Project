@@ -90,6 +90,7 @@ void ring_buffer_clear(ring_buffer_s* pRingBuffer);
 
 //todo fix this?
 RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer);
+RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_get_accel_sample(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer);
 
 RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_parse_data_buffer(ring_buffer_s* pRingBuffer, s16* data);
 
