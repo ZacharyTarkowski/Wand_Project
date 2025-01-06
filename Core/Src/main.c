@@ -231,8 +231,9 @@ int main(void)
 				{
 					first_run = 0;
 					
-					ring_buffer_clear(&ring_buffer_idle);
-					status = MPU6050_reset_fifo_(pMPU6050);
+          //dont want to clear anymore, for movement detection
+					//ring_buffer_clear(&ring_buffer_idle);
+					status = ring_buffer_MPU6050_get_accel_sample(pMPU6050, &ring_buffer_idle);
 					data_ready_flag = 0;
 					
 					if(status != HAL_OK)
@@ -247,15 +248,16 @@ int main(void)
 				{
 					data_ready_flag = 0;
 
-					status = ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_idle );
+					status = ring_buffer_MPU6050_get_accel_sample(pMPU6050, &ring_buffer_idle);
 					if(status != HAL_OK)
 					{
 						uart_println("Read and store failed");
 						MPU6050_hard_reset_flag = 1;
 					}
 
+          //constantly doing angle calcs, dont need to do it that way...
           get_accel_angles(&ring_buffer_idle,&pitch_accel,&roll_accel);
-          //uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
+          uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
 
           //compfilter_tick(&ring_buffer_idle,&pitch_accel,&roll_accel);
           //uart_println("Angle estimates comp : Pitch %f, Roll %f", pitch_accel, roll_accel);
@@ -347,16 +349,6 @@ int main(void)
         ring_buffer_pitch_roll_rotation(&ring_buffer_capture_1,pitch_accel_1,roll_accel_1);
         ring_buffer_pitch_roll_rotation(&ring_buffer_capture_2,pitch_accel_2,roll_accel_2);
 
-        uart_println("Ring Buffer 1 Post Rotation");
-				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_1);
-				//ring_buffer_print_to_write_index(&ring_buffer_capture_1);
-
-        uart_println("Ring Buffer 2 Post Rotation");
-				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_2);
-				//ring_buffer_print_to_write_index(&ring_buffer_capture_2);
-
-        
-
         uart_println("DTW Post rotation");
 				result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
 				print_dtw_result(&result);
@@ -375,9 +367,6 @@ int main(void)
 
 			case COMPARE_STATIC:
 				uart_println("Ring Buffer 1");
-				
-        ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_1);
-        //ring_buffer_print_to_write_index(&ring_buffer_1);
 
         uart_println("Circle DTW");
         uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel_1, roll_accel_1 );
@@ -404,12 +393,8 @@ int main(void)
 				//hard reset
 
 				uart_println("MPU6050 Hard Reset Needed");
-
-				//debug
-				while(1)
-				{
-
-				}
+				//debug. need a circuit to powercycle the accelerometer
+				while(1){};
 			break;
 
 			default:
