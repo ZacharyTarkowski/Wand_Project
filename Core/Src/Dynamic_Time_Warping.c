@@ -1,12 +1,16 @@
 #include "Dynamic_Time_Warping.h"
 
-u32** single_dtw_buf;
+#ifdef ENABLE_NAIVE_SINGLE
+//u32 single_dtw_buf[135][135]; // Assuming you have space for n+1 and m+1 elements
+#else
+u32 single_dtw_buf[1][1];
+#endif
 u32*** multi_dtw_buf;
 
 DTWSettings g_dtw_settings;
 seq_t * dtw;
 
-buffer_element dtw_memo[2][sizeof(buffer_element) * RING_BUFFER_MAX_SIZE];
+buffer_element dtw_memo[2][RING_BUFFER_MAX_SIZE];
 
 
 
@@ -30,65 +34,100 @@ void free_dtw_buf()
     //free dtw buffer after preallocated
 }
 
-u32 dtw_single(buffer_element *s, buffer_element *t, u32 n, u32 m) {
+u32 dtw_single(buffer_element *s, u32 n, buffer_element *t, u32 m) {
     
+    #ifdef ENABLE_NAIVE_SINGLE
+        return 0;
+    #endif
+  
     u32 i, j;
+    
 
+    // Initialize the buffer
     for(i = 0; i <= n; i++) {
         for(j = 0; j <= m; j++) {
             if (i == 0 && j == 0) {
                 single_dtw_buf[i][j] = 0;
-            } else if (i == 0) {
-                single_dtw_buf[i][j] = 0xFFFFFFFF;
-            } else if (j == 0) {
-                single_dtw_buf[i][j] = 0xFFFFFFFF;
-            } else {
-                u32 cost = abs(s[i - 1] - t[j - 1]);
-                single_dtw_buf[i][j] = cost + MIN(MIN(single_dtw_buf[i - 1][j], single_dtw_buf[i][j - 1]), single_dtw_buf[i - 1][j - 1]);
+            } else if (i == 0 || j == 0) {
+                single_dtw_buf[i][j] = 0xFFFFFFFF; // Infinity for boundary conditions
             }
         }
     }
 
-    u32 distance = single_dtw_buf[n][m];
+    // Compute the DTW matrix
+    for(i = 1; i <= n; i++) {
+        for(j = 1; j <= m; j++) {
+            u32 cost = abs(s[i - 1] - t[j - 1]);
+            single_dtw_buf[i][j] = cost + MIN(MIN(single_dtw_buf[i - 1][j], single_dtw_buf[i][j - 1]), single_dtw_buf[i - 1][j - 1]);
+        }
+    }
 
-    return distance;
+    // Return the final DTW distance
+    return single_dtw_buf[n][m];
+    
 }
 
 u32 dtw_single_memo(buffer_element *s, u32 n, buffer_element *t, u32 m)
 {
-    s32 p, c, temp, cost;
-    memset(&dtw_memo[1][0], 0xFFFFFFFF, RING_BUFFER_MAX_SIZE * sizeof(buffer_element));
-    dtw_memo[0][0] = 0;
-    p = 1; c = 2;
+    u32 i, j, p, c, temp;
 
-    for(int i = 1; i<n; i++)
-    {
-        for(int j = 1; j<m; j++)
-        {
-            s32 temp2 = s[i-1]-t[j-1];
-            cost = pow( temp2 , 2);
-            dtw_memo[c][j] = cost + MIN( MIN( dtw_memo[p][j] , dtw_memo[c][j-1] ), dtw_memo[p][j-1] );
-        }
+    p = 0; c = 1;
 
-        temp = c; c = p; p = temp;  
+    for(j = 0; j <= m; j++) {
+        dtw_memo[p][j] = INFINITY;
+        dtw_memo[c][j] = INFINITY;
     }
 
-    return sqrt(dtw_memo[c][m]);
+    dtw_memo[c][0] = 0;
+
+    for(i = 1; i <= n; i++) 
+    {
+        for(j = 1; j <= m; j++) 
+        {
+            u32 cost = pow(s[i - 1] - t[j - 1], 2);
+            dtw_memo[c][j] = cost + MIN(MIN(dtw_memo[p][j], dtw_memo[c][j - 1]), dtw_memo[p][j - 1]);
+        }
+
+        // Only 0,0 starts at 0. 
+        if(i>1) {dtw_memo[p][0] = INFINITY;}
+
+        temp = c;
+        c = p;
+        p = temp;
+    }
+
+    u32 distance = dtw_memo[p][m];
+    distance = sqrt(distance);
+
+    return distance;
 }
 
 DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t)
 {
     DTW_Result result;
     u32 startTime = HAL_GetTick();
+
+    //result.x_accel_result = dtw_single(      s->buffer[0],     s->write_index,        t->buffer[0],    t->write_index) ;
+    //result.y_accel_result = dtw_distance(      s->buffer[1],     s->write_index,        t->buffer[1],    t->write_index, &g_dtw_settings) ;
+    //result.z_accel_result = dtw_single(      s->buffer[2],     s->write_index,        t->buffer[2],    t->write_index) ;
+    //uart_println("Single");
+    //print_dtw_result(&result);  
+
+
     //remember that if these return 0 likely a s32 somehow went negative and got square rooted
     result.x_accel_result = dtw_single_memo(      s->buffer[0],     s->write_index,        t->buffer[0],    t->write_index) ;
     //result.y_accel_result = dtw_distance(      s->buffer[1],     s->write_index,        t->buffer[1],    t->write_index, &g_dtw_settings) ;
     result.z_accel_result = dtw_single_memo(      s->buffer[2],     s->write_index,        t->buffer[2],    t->write_index) ;
+    uart_println("Memo");
+    print_dtw_result(&result);
+
+    
 
     g_dtw_settings = dtw_settings_default();
-    result.x_accel_result  = dtw_distance(      s->buffer[0],     s->write_index,        t->buffer[0],    t->write_index, &g_dtw_settings) ;
-    result.z_accel_result  = dtw_distance(      s->buffer[2],     s->write_index,        t->buffer[2],    t->write_index, &g_dtw_settings) ;
-
+    //result.x_accel_result  = dtw_distance(      s->buffer[0],     s->write_index,        t->buffer[0],    t->write_index, &g_dtw_settings) ;
+    //result.z_accel_result  = dtw_distance(      s->buffer[2],     s->write_index,        t->buffer[2],    t->write_index, &g_dtw_settings) ;
+    //uart_println("DTAI");
+    //print_dtw_result(&result);
     //result.x_gyro_result  = dtw_distance(      s->buffer[3],     s->write_index,        t->buffer[3],    t->write_index, &g_dtw_settings) ;
     //result.y_gyro_result  = dtw_distance(      s->buffer[4],     s->write_index,        t->buffer[4],    t->write_index, &g_dtw_settings) ;
     //result.z_gyro_result  = dtw_distance(      s->buffer[5],     s->write_index,        t->buffer[5],    t->write_index, &g_dtw_settings) ;

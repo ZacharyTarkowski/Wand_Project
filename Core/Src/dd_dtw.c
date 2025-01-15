@@ -17,7 +17,7 @@ extern seq_t* dtw;
 /* Create settings struct with default values (all extras deactivated). */
 DTWSettings dtw_settings_default(void) {
     DTWSettings s = {
-        .window = 25,
+        .window = 256,
         .max_dist = 0,
         .max_step = 0,
         .max_length_diff = 0,

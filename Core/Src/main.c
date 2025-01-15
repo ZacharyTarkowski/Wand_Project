@@ -170,8 +170,8 @@ int main(void)
 
 
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
-  status |= ring_buffer_init(&ring_buffer_capture_1, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_2_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
-	status |= ring_buffer_init(&ring_buffer_capture_2, ring_3_initial_data, sizeof(ring_3_initial_data), MPU_6050_NUM_DIMS,  sizeof(ring_3_initial_data) / MPU_6050_NUM_DIMS / sizeof(buffer_element) );
+  status |= ring_buffer_init(&ring_buffer_capture_1, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE );
+	status |= ring_buffer_init(&ring_buffer_capture_2, ring_3_initial_data, sizeof(ring_3_initial_data), MPU_6050_NUM_DIMS, RING_BUFFER_MAX_SIZE );
   status |= ring_buffer_init(&ring_buffer_idle, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
   
 	status |= dtw_init();
@@ -211,6 +211,8 @@ int main(void)
   volatile float roll_accel_deg  = 0;
 
   DTW_Distance(&ring_buffer_capture_1 , &ring_buffer_capture_2);
+  ring_buffer_clear(&ring_buffer_capture_1);
+  ring_buffer_clear(&ring_buffer_capture_2);
 
 	while (1)
 	{
@@ -280,14 +282,14 @@ int main(void)
 				{
 					uart_println("Capturing %d",state);
 					first_run = 0;
-					status = MPU6050_reset_fifo_(pMPU6050);
-					data_ready_flag = 0;
+					//status = MPU6050_reset_fifo_(pMPU6050);
+					//data_ready_flag = 0;
 
-					if(status != HAL_OK)
-					{
-						uart_println("Failed to reset FIFO!");
-						MPU6050_hard_reset_flag = 1;
-					}
+					// if(status != HAL_OK)
+					// {
+					// 	uart_println("Failed to reset FIFO!");
+					// 	MPU6050_hard_reset_flag = 1;
+					// }
 
           if(state == CAPTURE_1)
           {
@@ -307,7 +309,7 @@ int main(void)
 				{
 					data_ready_flag = 0;
 
-					status = ring_buffer_MPU6050_read_and_store(pMPU6050, ( state==CAPTURE_1 ? &ring_buffer_capture_1 : &ring_buffer_capture_2 ) );
+					status = ring_buffer_MPU6050_get_accel_sample(pMPU6050, ( state==CAPTURE_1 ? &ring_buffer_capture_1 : &ring_buffer_capture_2 ) );
 					if(status != HAL_OK)
 					{
 						MPU6050_hard_reset_flag = 1;
@@ -335,11 +337,11 @@ int main(void)
 
 				uart_println("Ring Buffer 1");
 				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_1);
-				//ring_buffer_print_to_write_index(&ring_buffer_capture_1);
+				ring_buffer_print_to_write_index(&ring_buffer_capture_1);
 
 				uart_println("Ring Buffer 2");
 				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_2);
-				//ring_buffer_print_to_write_index(&ring_buffer_capture_2);
+				ring_buffer_print_to_write_index(&ring_buffer_capture_2);
 
         uart_println("Angle estimates 1 : Pitch %f, Roll %f", pitch_accel_1, roll_accel_1);
         uart_println("Angle estimates 2 : Pitch %f, Roll %f", pitch_accel_2, roll_accel_2 );
