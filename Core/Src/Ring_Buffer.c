@@ -167,7 +167,7 @@ RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buf
 		if(pRingBuffer->write_index >= pRingBuffer->dim_size)
 		{
 			pRingBuffer->write_index = 0;
-			//uart_println("ring buffer rollover");
+			uart_println("ring buffer rollover");
 		}
 
 		status =  RING_BUFFER_SUCCESS;

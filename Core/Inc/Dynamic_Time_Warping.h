@@ -6,8 +6,16 @@
 #include "dd_dtw.h"
 
 #include <stdlib.h>
+#include <math.h>
 
-//#define MIN(a,b) ((a) < (b)  ? (a) : (b) )
+#define MIN(a,b) ((a) < (b)  ? (a) : (b) )
+#define MAX(a,b) ((a) > (b)  ? (a) : (b) )
+
+//Highest signed integer. Still undecided on using UINTS, but 
+//0xFFFFFFFF causes problems for signed addition and 0x7FFFFFFF is sufficiently high enough for this data anyway
+#define INFINITY 0x7FFFFFFF
+
+#define DTW_WINDOW_PERCENTAGE 10
 
 typedef struct DTW_Result
 {
