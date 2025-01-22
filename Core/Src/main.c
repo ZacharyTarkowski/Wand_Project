@@ -211,6 +211,11 @@ int main(void)
   volatile float roll_accel_deg  = 0;
 
   DTW_Distance(&ring_buffer_capture_1 , &ring_buffer_capture_2);
+  ring_buffer_pitch_roll_rotation(&ring_buffer_capture_1,0,0);
+  ring_buffer_pitch_roll_rotation(&ring_buffer_capture_2,0,90);
+
+  uart_println("DTW Post rotation");
+  result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
   ring_buffer_clear(&ring_buffer_capture_1);
   ring_buffer_clear(&ring_buffer_capture_2);
 
@@ -337,11 +342,11 @@ int main(void)
 
 				uart_println("Ring Buffer 1");
 				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_1);
-				ring_buffer_print_to_write_index(&ring_buffer_capture_1);
+				//ring_buffer_print_to_write_index(&ring_buffer_capture_1);
 
 				uart_println("Ring Buffer 2");
 				//ring_buffer_MPU6050_apply_mean_centering(&ring_buffer_capture_2);
-				ring_buffer_print_to_write_index(&ring_buffer_capture_2);
+				//ring_buffer_print_to_write_index(&ring_buffer_capture_2);
 
         uart_println("Angle estimates 1 : Pitch %f, Roll %f", pitch_accel_1, roll_accel_1);
         uart_println("Angle estimates 2 : Pitch %f, Roll %f", pitch_accel_2, roll_accel_2 );

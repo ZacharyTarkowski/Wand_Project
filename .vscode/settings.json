@@ -16,7 +16,8 @@
         "orientation_utils.h": "c",
         "signal.h": "c",
         "stddef.h": "c",
-        "cmath": "c"
+        "cmath": "c",
+        "math.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false
 }
