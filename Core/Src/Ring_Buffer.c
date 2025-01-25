@@ -27,6 +27,7 @@ RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, buffer_eleme
 		pRingBuffer->num_dims = num_dims;
 		pRingBuffer->dim_size = dim_size;
 		pRingBuffer->write_index = 0;
+		pRingBuffer->read_index = 0;
 
 		pRingBuffer->print_function = &MPU6050_print_data;
 		status = RING_BUFFER_SUCCESS;
@@ -194,6 +195,24 @@ RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 
 	}
 
 	return status;
+}
+
+//not a ring buffer function, used to read an array at an index and wrap around
+//starts at an arbitray index and returns the element 
+buffer_element read_buffer_wraparound(buffer_element* data, u32 start_index, u32 max_index, u32 index )
+{
+	if(start_index < max_index)
+	{
+		if(start_index + index < max_index)
+		{
+			return data[start_index + index];
+		}
+		else 
+		{
+			return data[index - (max_index - start_index)];
+		}
+	}
+
 }
 
 void ring_buffer_print_all_elements(ring_buffer_s* pRingBuffer)

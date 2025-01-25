@@ -46,6 +46,7 @@ volatile u8 timer_flag = 0;
 
 ring_buffer_s ring_buffer_capture_1;
 ring_buffer_s ring_buffer_capture_2;
+ring_buffer_s ring_buffer_capture_3;
 ring_buffer_s ring_buffer_idle;
 
 /* USER CODE END Includes */
@@ -170,8 +171,9 @@ int main(void)
 
 
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
-  status |= ring_buffer_init(&ring_buffer_capture_1, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE );
-	status |= ring_buffer_init(&ring_buffer_capture_2, ring_3_initial_data, sizeof(ring_3_initial_data), MPU_6050_NUM_DIMS, RING_BUFFER_MAX_SIZE );
+  status |= ring_buffer_init(&ring_buffer_capture_1, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  SPELL_SIZE + DTW_WINDOW );
+	status |= ring_buffer_init(&ring_buffer_capture_2, ring_3_initial_data, sizeof(ring_3_initial_data), MPU_6050_NUM_DIMS, SPELL_SIZE + DTW_WINDOW );
+  status |= ring_buffer_init(&ring_buffer_capture_3, 0, 0, MPU_6050_NUM_DIMS, SPELL_SIZE + DTW_WINDOW );
   status |= ring_buffer_init(&ring_buffer_idle, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
   
 	status |= dtw_init();
@@ -210,14 +212,20 @@ int main(void)
   volatile float pitch_accel_deg = 0;
   volatile float roll_accel_deg  = 0;
 
-  DTW_Distance(&ring_buffer_capture_1 , &ring_buffer_capture_2);
+  u32 num_samples = 0;
+  u32 sample_window_start = 0;
+
   ring_buffer_pitch_roll_rotation(&ring_buffer_capture_1,0,0);
   ring_buffer_pitch_roll_rotation(&ring_buffer_capture_2,0,90);
 
   uart_println("DTW Post rotation");
   result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
-  ring_buffer_clear(&ring_buffer_capture_1);
-  ring_buffer_clear(&ring_buffer_capture_2);
+  result = DTW_Distance(&ring_buffer_capture_2, &ring_buffer_capture_1);
+
+  //ring_buffer_clear(&ring_buffer_capture_1);
+  //ring_buffer_clear(&ring_buffer_capture_2);
+
+  state = ROLLING_COMPARE;
 
 	while (1)
 	{
@@ -337,6 +345,42 @@ int main(void)
 				}
 			}
 			break;
+
+      case ROLLING_COMPARE:
+
+        if(data_ready_flag && !MPU6050_hard_reset_flag)
+        {
+          data_ready_flag = 0;
+
+          status = ring_buffer_MPU6050_get_accel_sample(pMPU6050, &ring_buffer_capture_3 );
+          if(status != HAL_OK)
+          {
+            MPU6050_hard_reset_flag = 1;
+          }
+
+          //constantly doing angle calcs, dont need to do it that way...
+          get_accel_angles(&ring_buffer_capture_3,&pitch_accel,&roll_accel);
+          
+          num_samples++;
+        }
+
+        //remember the first (spellsize / window) are essentially worthless
+        if(num_samples >= DTW_WINDOW)
+        {
+          uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
+          ring_buffer_pitch_roll_rotation(&ring_buffer_capture_3, pitch_accel, roll_accel);
+          uart_println("Comparison to %s",spell_name_2);
+          ring_buffer_capture_3.read_index = sample_window_start;
+          result = DTW_Distance(&ring_buffer_capture_3, &ring_buffer_capture_2);
+          print_dtw_result(&result);
+
+          sample_window_start += DTW_WINDOW;
+          if(sample_window_start >= SPELL_SIZE) {sample_window_start -= SPELL_SIZE; }
+
+          num_samples = 0;
+        }
+
+      break;
 
 			case PRINT_AND_COMPARE:
 
