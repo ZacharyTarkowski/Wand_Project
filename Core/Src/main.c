@@ -46,6 +46,9 @@ volatile u8 timer_flag = 0;
 
 ring_buffer_s ring_buffer_capture_1;
 ring_buffer_s ring_buffer_capture_2;
+ring_buffer_s ring_buffer_capture_3;
+ring_buffer_s ring_buffer_spell_1;
+ring_buffer_s ring_buffer_spell_2;
 ring_buffer_s ring_buffer_idle;
 
 /* USER CODE END Includes */
@@ -170,8 +173,13 @@ int main(void)
 
 
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
-  status |= ring_buffer_init(&ring_buffer_capture_1, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE );
-	status |= ring_buffer_init(&ring_buffer_capture_2, ring_3_initial_data, sizeof(ring_3_initial_data), MPU_6050_NUM_DIMS, RING_BUFFER_MAX_SIZE );
+  status |= ring_buffer_init(&ring_buffer_capture_1, ring_1_initial_data, sizeof(ring_1_initial_data), MPU_6050_NUM_DIMS,  SPELL_SIZE);
+	status |= ring_buffer_init(&ring_buffer_capture_2, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS, SPELL_SIZE);
+  status |= ring_buffer_init(&ring_buffer_capture_3, 0, 0, MPU_6050_NUM_DIMS, SPELL_SIZE);
+
+  status |= ring_buffer_init(&ring_buffer_spell_1, ring_1_initial_data, sizeof(ring_1_initial_data), MPU_6050_NUM_DIMS,  SPELL_SIZE );
+	status |= ring_buffer_init(&ring_buffer_spell_2, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS, SPELL_SIZE );
+
   status |= ring_buffer_init(&ring_buffer_idle, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
   
 	status |= dtw_init();
@@ -210,14 +218,40 @@ int main(void)
   volatile float pitch_accel_deg = 0;
   volatile float roll_accel_deg  = 0;
 
-  DTW_Distance(&ring_buffer_capture_1 , &ring_buffer_capture_2);
-  ring_buffer_pitch_roll_rotation(&ring_buffer_capture_1,0,0);
-  ring_buffer_pitch_roll_rotation(&ring_buffer_capture_2,0,90);
+  u32 num_samples = 0;
+  u32 sample_window_start = 0;
+
+  //ring_buffer_pitch_roll_rotation(&ring_buffer_capture_1,0,0);
+  //ring_buffer_pitch_roll_rotation(&ring_buffer_capture_2,0,0);
 
   uart_println("DTW Post rotation");
   result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
+  result = DTW_Distance(&ring_buffer_capture_2, &ring_buffer_capture_1);
+
+  buffer_element temp[6];
+  for(int i = 0; i< 384; i++)
+  {
+    buffer_element temp[6] = {i*1000};
+    ring_buffer_write_element(&ring_buffer_capture_3,temp);
+  }
+  //ring_buffer_print_all_elements(&ring_buffer_capture_3);
+  ring_buffer_print_all_elements_from_read_index(&ring_buffer_capture_3);
+  ring_buffer_capture_3.rollover_count = 1;
+  ring_buffer_pitch_roll_rotation(&ring_buffer_capture_3,0,0);
+  ring_buffer_capture_3.rollover_count = 0;
+  ring_buffer_print_all_elements_from_read_index(&ring_buffer_capture_3);
+  ring_buffer_capture_3.rollover_count = 0;
+  ring_buffer_pitch_roll_rotation(&ring_buffer_capture_3,0,180);
+  ring_buffer_capture_3.rollover_count = 0;
+  ring_buffer_pitch_roll_rotation(&ring_buffer_capture_3,0,180);
+  //ring_buffer_print_all_elements_from_read_index(&ring_buffer_capture_3);
+
   ring_buffer_clear(&ring_buffer_capture_1);
   ring_buffer_clear(&ring_buffer_capture_2);
+  ring_buffer_clear(&ring_buffer_capture_3);
+
+  //state = ROLLING_COMPARE;
+  state = IDLE;
 
 	while (1)
 	{
@@ -266,7 +300,7 @@ int main(void)
 
           //constantly doing angle calcs, dont need to do it that way...
           get_accel_angles(&ring_buffer_idle,&pitch_accel,&roll_accel);
-          uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
+          //uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
 
           //compfilter_tick(&ring_buffer_idle,&pitch_accel,&roll_accel);
           //uart_println("Angle estimates comp : Pitch %f, Roll %f", pitch_accel, roll_accel);
@@ -338,6 +372,52 @@ int main(void)
 			}
 			break;
 
+      case ROLLING_COMPARE:
+
+        if(data_ready_flag && !MPU6050_hard_reset_flag)
+        {
+          data_ready_flag = 0;
+
+          status = ring_buffer_MPU6050_get_accel_sample(pMPU6050, &ring_buffer_capture_3 );
+          if(status != HAL_OK)
+          {
+            MPU6050_hard_reset_flag = 1;
+          }
+
+         
+          
+          num_samples++;
+        }
+
+        //remember the first (spellsize / window) are essentially worthless
+        if(num_samples >= DTW_WINDOW && ring_buffer_capture_3.rollover_count > 0)
+        {
+          //get acceleration for the beginning of the calc, not like this
+          //get_accel_angles(&ring_buffer_capture_3,&pitch_accel,&roll_accel);
+          uart_println("Before");
+          //ring_buffer_print_all_elements_from_read_index(&ring_buffer_capture_3);
+          result = DTW_Distance(&ring_buffer_capture_3, &ring_buffer_spell_2);
+
+          get_accel_angles(&ring_buffer_capture_3,&pitch_accel,&roll_accel);
+          uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
+          ring_buffer_pitch_roll_rotation(&ring_buffer_capture_3, pitch_accel, roll_accel);
+
+          
+          
+          uart_println("Comparison to %s",spell_name_2);
+          //ring_buffer_print_all_elements_from_read_index(&ring_buffer_capture_3);
+          
+          result = DTW_Distance(&ring_buffer_capture_3, &ring_buffer_spell_2);
+          //print_dtw_result(&result);
+
+          sample_window_start += DTW_WINDOW;
+          if(sample_window_start >= SPELL_SIZE) {sample_window_start -= SPELL_SIZE; }
+
+          num_samples = 0;
+        }
+
+      break;
+
 			case PRINT_AND_COMPARE:
 
 				uart_println("Ring Buffer 1");
@@ -353,15 +433,29 @@ int main(void)
 
         uart_println("DTW pre rotation");
         result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
-				print_dtw_result(&result);
+
+        //temp
+        uart_println("Buf1 Pre rotation");
+        ring_buffer_print_to_write_index(&ring_buffer_capture_1);
+				result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_spell_2);
+        uart_println("Buf2 Pre rotation");
+        ring_buffer_print_to_write_index(&ring_buffer_capture_2);
+				result = DTW_Distance(&ring_buffer_capture_2, &ring_buffer_spell_2);
 
         ring_buffer_pitch_roll_rotation(&ring_buffer_capture_1,pitch_accel_1,roll_accel_1);
         ring_buffer_pitch_roll_rotation(&ring_buffer_capture_2,pitch_accel_2,roll_accel_2);
 
         uart_println("DTW Post rotation");
 				result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_capture_2);
-				print_dtw_result(&result);
 
+
+        //temp
+        uart_println("Buf1 post rotation");
+        ring_buffer_print_to_write_index(&ring_buffer_capture_1);
+				result = DTW_Distance(&ring_buffer_capture_1, &ring_buffer_spell_2);
+        uart_println("Buf2 post rotation");
+        ring_buffer_print_to_write_index(&ring_buffer_capture_2);
+				result = DTW_Distance(&ring_buffer_capture_2, &ring_buffer_spell_2);
 
 				ring_buffer_clear(&ring_buffer_capture_1);
 				ring_buffer_clear(&ring_buffer_capture_2);

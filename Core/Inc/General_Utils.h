@@ -16,6 +16,14 @@
 #include "stdio.h"
 #include "stdarg.h"
 
+//save place for function comment header
+/**   
+*   Name  : 
+*   Brief : 
+*   Param : 
+*   Return: 
+*/
+
 extern UART_HandleTypeDef huart2;
 
 

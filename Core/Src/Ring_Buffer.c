@@ -27,6 +27,8 @@ RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, buffer_eleme
 		pRingBuffer->num_dims = num_dims;
 		pRingBuffer->dim_size = dim_size;
 		pRingBuffer->write_index = 0;
+		pRingBuffer->read_index = 0;
+		pRingBuffer->rollover_count = 0;
 
 		pRingBuffer->print_function = &MPU6050_print_data;
 		status = RING_BUFFER_SUCCESS;
@@ -151,7 +153,7 @@ RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_get_accel_sample(Mpu_6050_handle_s* h
 	return status;
 }
 
-//call by using something like buffer_element[pRingBuffer->num_dims] = {1,2,3};
+//call by using something like buffer_element name[pRingBuffer->num_dims] = {1,2,3};
 RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buffer_element* data)
 {
 	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
@@ -164,9 +166,17 @@ RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buf
 		}
 		pRingBuffer->write_index++;
 
+		//bad, read index doesnt need to exist. it is either 0 (no rollovers yet) or write_index after a rollover
+		if(pRingBuffer->rollover_count > 0)
+		{
+			pRingBuffer->read_index++;
+		}
+
 		if(pRingBuffer->write_index >= pRingBuffer->dim_size)
 		{
 			pRingBuffer->write_index = 0;
+			pRingBuffer->read_index = 0;
+			pRingBuffer->rollover_count++;
 			uart_println("ring buffer rollover");
 		}
 
@@ -196,6 +206,41 @@ RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 
 	return status;
 }
 
+buffer_element ring_buffer_read(ring_buffer_s* pRingBuffer, u32 dim, u32 index)
+{
+
+	if(index < pRingBuffer->dim_size)
+	{
+		if(pRingBuffer->read_index + index < pRingBuffer->dim_size)
+		{
+			return pRingBuffer->buffer[dim][pRingBuffer->read_index + index];
+		}
+		else 
+		{
+			return pRingBuffer->buffer[dim][index - (pRingBuffer->dim_size - pRingBuffer->read_index)];
+		}
+	}
+
+}
+
+//not a ring buffer function, used to read an array at an index and wrap around
+//starts at an arbitray index and returns the element 
+buffer_element read_buffer_wraparound(buffer_element* data, u32 start_index, u32 max_index, u32 index )
+{
+	if(start_index < max_index)
+	{
+		if(start_index + index < max_index)
+		{
+			return data[start_index + index];
+		}
+		else 
+		{
+			return data[index - (max_index - start_index)];
+		}
+	}
+
+}
+
 void ring_buffer_print_all_elements(ring_buffer_s* pRingBuffer)
 {
 	for(u32 i = 0; i< pRingBuffer->dim_size; i++)
@@ -203,6 +248,19 @@ void ring_buffer_print_all_elements(ring_buffer_s* pRingBuffer)
 		for(u32 j = 0; j< pRingBuffer->num_dims; j++)
 		{
 			uart_printf(ringBufPrint,pRingBuffer->buffer[j][i]);
+		}
+		uart_println("");
+	}
+	
+}
+
+void ring_buffer_print_all_elements_from_read_index(ring_buffer_s* pRingBuffer)
+{
+	for(u32 i = 0; i< pRingBuffer->dim_size; i++)
+	{
+		for(u32 j = 0; j< pRingBuffer->num_dims; j++)
+		{
+			uart_printf(ringBufPrint, ring_buffer_read(pRingBuffer, j, i));
 		}
 		uart_println("");
 	}
@@ -238,6 +296,7 @@ void ring_buffer_clear(ring_buffer_s* pRingBuffer)
 		memset(pRingBuffer->buffer[i], 0x0, pRingBuffer->dim_size * sizeof(buffer_element));
 	}
 	pRingBuffer->write_index = 0;
+	pRingBuffer->rollover_count = 0;
 }
 
 void ring_buffer_destroy(ring_buffer_s* pRingBuffer)
