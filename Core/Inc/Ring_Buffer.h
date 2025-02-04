@@ -64,6 +64,7 @@ typedef struct ring_buffer_s
     u32 read_index;
     u32 num_dims;
     u32 dim_size;
+    u32 rollover_count;
     void (*print_function)(buffer_element* pData);
 } ring_buffer_s;
 
@@ -84,11 +85,13 @@ RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, buffer_eleme
 RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buffer_element* data);
 RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 index, buffer_element* data);
 
+buffer_element ring_buffer_read(ring_buffer_s* pRingBuffer, u32 dim, u32 index);
 buffer_element read_buffer_wraparound(buffer_element* data, u32 start_index, u32 max_index, u32 index );
 
 void ring_buffer_print_all_elements(ring_buffer_s* pRingBuffer);
 void ring_buffer_print_to_write_index(ring_buffer_s* pRingBuffer);
 void ring_buffer_print_element(ring_buffer_s* pRingBuffer, u32 index);
+void ring_buffer_print_all_elements_from_read_index(ring_buffer_s* pRingBuffer);
 
 void ring_buffer_clear(ring_buffer_s* pRingBuffer);
 

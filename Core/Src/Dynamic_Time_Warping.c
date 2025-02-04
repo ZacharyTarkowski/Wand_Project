@@ -15,7 +15,12 @@ seq_t * dtw;
 
 buffer_element dtw_memo[2][RING_BUFFER_MAX_SIZE];
 
-
+/**   
+*   Name  : dtw_init
+*   Brief : Allocates the memory used for dynamic time warping (in the dtaid library, not the homebrew)
+*   Param : 
+*   Return: 
+*/
 HAL_StatusTypeDef dtw_init()
 {
     g_dtw_settings = dtw_settings_default();
@@ -30,11 +35,23 @@ HAL_StatusTypeDef dtw_init()
     return HAL_OK;
 }
 
+/**   
+*   Name  : free_dtw_buf
+*   Brief : Frees the allocated DTW memory
+*   Param : 
+*   Return: 
+*/
 void free_dtw_buf()
 {
-    //free dtw buffer after preallocated
+    free(dtw);
 }
 
+/**   
+*   Name  : dtw_single
+*   Brief : Depricated, naive implementation of dynamic time warping [ O(n^2) space and time efficient ]
+*   Param : 
+*   Return: 
+*/
 u32 dtw_single(buffer_element *s, u32 n, buffer_element *t, u32 m) {
     
     #ifdef ENABLE_NAIVE_SINGLE
@@ -68,6 +85,12 @@ u32 dtw_single(buffer_element *s, u32 n, buffer_element *t, u32 m) {
     
 }
 
+/**   
+*   Name  : dtw_single_memo
+*   Brief : Depricated, memoized dynamic time warping. [ O(n^2) time efficient, O(2*n) space efficient) ]
+*   Param : 
+*   Return: 
+*/
 u32 dtw_single_memo(buffer_element *s, u32 n, buffer_element *t, u32 m)
 {
     u32 i, j, p, c, temp;
@@ -104,12 +127,13 @@ u32 dtw_single_memo(buffer_element *s, u32 n, buffer_element *t, u32 m)
 }
 
 
-/*
-*  Handmade Dynamic Time Warping with Window and Memoization
-*  Dynamic Time Warping Algorithm, O(n*w) time complexity, O(2*n) space complexity
-*
+/**   
+*   Name  : dtw_single_memo_with_window
+*   Brief : Handmade Dynamic Time Warping with window and memoization [ O(n*w) time complexity, O(2*n) space complexity) ]
+*   Param : Takes two buffers and their lengths.
+*   Return: Returns the DTW distance between the two buffers. Also may return 46340, which is sqrt(0x7FFFFFFF), meaning a minimum cost path was not found. 
 */
-u32 dtw_single_memo_with_window(buffer_element *s, u32 n, buffer_element *t, u32 m, u32 n_start, u32 m_start, u32 n_max, u32 m_max)
+u32 dtw_single_memo_with_window(buffer_element *s, u32 n, buffer_element *t, u32 m)
 {
     s32 i, j, p, c, temp, w;
 
@@ -151,18 +175,73 @@ u32 dtw_single_memo_with_window(buffer_element *s, u32 n, buffer_element *t, u32
 
             //don't use POW for ints! slows it way down, probably has to use the FPU
             //u32 cost = pow(s[i - 1] - t[j - 1], 2);
-            //s32 cost = s[i - 1] - t[j - 1]; 
+            s32 cost = s[i - 1] - t[j - 1]; 
+            cost = cost * cost;
+            
+            dtw_memo[c][j] = cost + MIN(MIN(dtw_memo[p][j], dtw_memo[c][j - 1]), dtw_memo[p][j - 1]);
+        }
 
-            //fixme I hate this. pipe in ringbuffer objects with a dimension select instead of this n_start n_max garbage.
-            //fixme
-            //fixme
-            //fixme
-            //fixme
-            s32 si = read_buffer_wraparound(s, n_start, n_max, i - 1);
-            s32 tj = read_buffer_wraparound(t, m_start, m_max, j - 1);
-            s32 cost = si - tj;
+        temp = c;
+        c = p;
+        p = temp;
+    }
 
-            //square the cost
+    u32 distance = dtw_memo[p][m];
+
+    distance = sqrt(distance);
+
+    return distance;
+}
+
+/**   
+*   Name  : dtw_single_memo_with_window_ring_buffer
+*   Brief : Bastardized dtw_single_memo_with_window function to run starting from any element of a ring buffer
+*   Param : Takes two ring buffers buffers and their lengths.
+*   Return: Returns the DTW distance between the two buffers. Also may return 46340, which is sqrt(0x7FFFFFFF), meaning a minimum cost path was not found. 
+*/
+u32 dtw_single_memo_with_window_ring_buffer(ring_buffer_s *s, u32 n, ring_buffer_s *t, u32 m, u32 dim)
+{
+    s32 i, j, p, c, temp, w;
+
+    w = DTW_WINDOW;
+
+    p = 0; c = 1;
+
+    //todo replace this with a memset no reason to loop
+    for(j = 0; j <= m; j++) {
+        dtw_memo[p][j] = INFINITY;
+        dtw_memo[c][j] = INFINITY;
+    }
+
+    dtw_memo[c][0] = 0;
+
+    for(i = 1; i <= n; i++) 
+    {
+
+        // Only 0,0 starts at 0. Backfill infinities outside of the working band.
+        // Mueen and Keogh omit this step when applying memoization...
+        if(i>1) 
+        {
+            //todo replace this with a memset no reason to loop
+            for(j = 0; j<MAX(1,i-w); j++)
+            {
+                dtw_memo[c][j] = INFINITY;
+            }
+        }
+
+        for(j = MAX(1,i-w); j <= MIN(m,i+w); j++) 
+        {
+            
+
+            //original dtw cost function. 
+            //decided against it based on Parameterizing the cost function of Dynamic Time Warping with application to time series classification Matthieu Herrmann · Chang Wei Tan · Geoffrey I. Webb
+            //https://arxiv.org/pdf/2301.10350
+
+            //u32 cost = abs(s[i - 1] - t[j - 1]);
+
+            //don't use POW for ints! slows it way down, probably has to use the FPU
+            //u32 cost = pow(s[i - 1] - t[j - 1], 2);
+            s32 cost = ring_buffer_read(s, dim, i-1) - ring_buffer_read(t, dim, j-1); 
             cost = cost * cost;
             
             dtw_memo[c][j] = cost + MIN(MIN(dtw_memo[p][j], dtw_memo[c][j - 1]), dtw_memo[p][j - 1]);
@@ -188,13 +267,19 @@ DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t)
     #ifdef DTW_TIMING_ANALYSIS
     u32 startTime = HAL_GetTick();
     #endif
-
-    result.x_accel_result = dtw_single_memo_with_window(      s->buffer[0],     256,        t->buffer[0],    256, s->read_index, t->read_index, s->dim_size, t->dim_size ) ;
-    result.z_accel_result = dtw_single_memo_with_window(      s->buffer[2],     256,        t->buffer[2],    256, s->read_index, t->read_index, s->dim_size, t->dim_size ) ;
+    //bad way of doing it theres some masking magic that would be better.
+    u32 s_size  = s->rollover_count > 0 ? (s->dim_size)-1 : s->write_index;
+    u32 t_size  = t->rollover_count > 0 ? (t->dim_size)-1 : t->write_index;
+    result.x_accel_result = dtw_single_memo_with_window(      s->buffer[0],     s->write_index,        t->buffer[0],    t->write_index) ;
+    result.z_accel_result = dtw_single_memo_with_window(      s->buffer[2],     s->write_index,        t->buffer[2],    t->write_index) ;
+    uart_println("Memo");
+    print_dtw_result(&result);
+    result.x_accel_result = dtw_single_memo_with_window_ring_buffer(      s,     s_size,        t,    t_size, 0) ;
+    result.z_accel_result = dtw_single_memo_with_window_ring_buffer(      s,     s_size,        t,    t_size, 2) ;
     uart_println("Windowed Memo");
     print_dtw_result(&result);
 
-    //sqrt of 7FFFFFFF (s32 "infinity"), didn't find a min cost path
+    //sqrt of 7FFFFFFF, didn't find a min cost path
     if(result.x_accel_result == 46340 || result.z_accel_result == 46340 || result.z_accel_result == INFINITY || result.z_accel_result == INFINITY)
     {
         uart_println("No path found, window likely must be larger");
@@ -202,8 +287,8 @@ DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t)
 
     #ifdef DTW_TIMING_ANALYSIS
     u32 endTime = HAL_GetTick();
-    uart_println("DTW time : %d %d %d", endTime - startTime, s->read_index, t->write_index);
     uart_println("DTW time : %d %d %d", endTime - startTime, s->write_index, t->write_index);
+    uart_println("DTW time : %d %d %d", endTime - startTime, s_size, t_size);
     #endif
 
     
