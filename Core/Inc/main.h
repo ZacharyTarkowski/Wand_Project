@@ -32,6 +32,23 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+//General Includes
+#include "General_Utils.h"
+#include "Ring_Buffer.h"
+#include "math.h"
+
+//Wand Functionality
+#include "Wand_Utils.h"
+#include "Static_Spells.h"
+#include "Orientation_Utils.h"
+#include "Dynamic_Time_Warping.h"
+#include "dd_dtw.h"
+
+//Drivers and Interrupts
+#include "MPU_6050_Utils.h"
+#include "LED_Utils.h"
+#include "Interrupt_Handles_STM32.h"
+
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/

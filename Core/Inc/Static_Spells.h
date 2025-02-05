@@ -7,9 +7,15 @@
 #define SPELL_SIZE 256
 
 //should probably just make a struct and then a global array of full of these structs
+static ring_buffer_s ring_buffer_capture_1;
+static ring_buffer_s ring_buffer_capture_2;
+static ring_buffer_s ring_buffer_capture_3;
+static ring_buffer_s ring_buffer_spell_1;
+static ring_buffer_s ring_buffer_spell_2;
+static ring_buffer_s ring_buffer_idle;
 
-const char* spell_name_1 = "Spell 1";
-const buffer_element ring_1_initial_data[] = 
+static const char* spell_name_1 = "Spell 1";
+static const buffer_element ring_1_initial_data[] = 
 {    
 -6, -954, 15681, 536871504, 0, 536968848,
 0, -954, 15687, 536871504, 0, 536968848,
@@ -269,8 +275,8 @@ const buffer_element ring_1_initial_data[] =
 0, -967, 15658, 536871504, 0, 536968848,
 };
 
-const char* spell_name_2 = "Spell 2";
-const buffer_element ring_2_initial_data[] = 
+static const char* spell_name_2 = "Spell 2";
+static const buffer_element ring_2_initial_data[] = 
 {
 -1208, -718, 15644, 0, 0, 0,
 -1206, -712, 15632, 0, 0, 0,

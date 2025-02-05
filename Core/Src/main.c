@@ -21,35 +21,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "General_Utils.h"
-#include "Ring_Buffer.h"
-#include "MPU_6050_Utils.h"
-
-#include "Dynamic_Time_Warping.h"
-#include "LED_Utils.h"
-
-#include "math.h"
-
-#include "dd_dtw.h"
-
-#include "Static_Spells.h"
-#include "Wand_Utils.h"
-#include "Orientation_Utils.h"
-
-Mpu_6050_handle_s MPU6050_handle;
-Mpu_6050_handle_s* pMPU6050 = &MPU6050_handle;
-
-volatile u8 data_ready_flag = 0;
-volatile u8 capture_flag = 0;
-volatile u32 capture_flag_valid_time;
-volatile u8 timer_flag = 0;
-
-ring_buffer_s ring_buffer_capture_1;
-ring_buffer_s ring_buffer_capture_2;
-ring_buffer_s ring_buffer_capture_3;
-ring_buffer_s ring_buffer_spell_1;
-ring_buffer_s ring_buffer_spell_2;
-ring_buffer_s ring_buffer_idle;
 
 /* USER CODE END Includes */
 
@@ -70,10 +41,12 @@ ring_buffer_s ring_buffer_idle;
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
-
 TIM_HandleTypeDef htim3;
 
 /* USER CODE BEGIN PV */
+
+Mpu_6050_handle_s MPU6050_handle;
+Mpu_6050_handle_s* pMPU6050 = &MPU6050_handle;
 
 /* USER CODE END PV */
 
@@ -90,39 +63,7 @@ static void MX_TIM3_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-	u32 capture_flag_current_time;
 
-	switch(GPIO_Pin)
-	{
-	case GPIO_PIN_9:
-		//uart_println("Data Ready Interrupt Triggered");
-		data_ready_flag = 1;
-		break;
-	case GPIO_PIN_10:
-		//uart_println("Button Press Interrupt Triggered");
-		capture_flag_current_time = HAL_GetTick();
-		if(capture_flag_current_time > capture_flag_valid_time)
-		{
-			capture_flag = !capture_flag;
-			capture_flag_valid_time = capture_flag_current_time + 250;
-		}
-		break;
-	default:
-		//uart_println("Unhandled interrupt triggered %d",GPIO_Pin);
-		break;
-	}
-}
-
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	if(htim->Instance == htim3.Instance)
-	{
-		timer_flag = 1;
-	}
-}
 
 /* USER CODE END 0 */
 

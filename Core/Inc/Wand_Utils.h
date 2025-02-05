@@ -1,10 +1,12 @@
 #ifndef H_WAND_UTILS
 #define H_WAND_UTILS
 
-
+//thresholds for a dtw match
 #define DTW_X_THRESHOLD 6500
 #define DTW_Y_THRESHOLD 6500
 #define DTW_Z_THRESHOLD 6500
+
+
 
 typedef enum  {
 	IDLE,
@@ -17,7 +19,7 @@ typedef enum  {
 	MAX_WAND_STATE
 }WAND_STATE;
 
-const char* wand_state_name_lut[MAX_WAND_STATE] = {
+static const char* wand_state_name_lut[MAX_WAND_STATE] = {
 	"IDLE",
 	"CAPTURE_1",
 	"CAPTURE_2",

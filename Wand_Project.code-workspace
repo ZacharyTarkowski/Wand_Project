@@ -1,0 +1,34 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"stm32f4xx.h": "c",
+			"main.h": "c",
+			"ring_buffer.h": "c",
+			"general_utils.h": "c",
+			"mpu_6050_utils.h": "c",
+			"dynamic_time_warping.h": "c",
+			"stm32f4xx_hal.h": "c",
+			"stdlib.h": "c",
+			"dd_dtw.h": "c",
+			"dd_globals.h": "c",
+			"dd_ed.h": "c",
+			"time.h": "c",
+			"stdint.h": "c",
+			"orientation_utils.h": "c",
+			"signal.h": "c",
+			"stddef.h": "c",
+			"cmath": "c",
+			"math.h": "c",
+			"stdio.h": "c",
+			"static_spells.h": "c",
+			"wand_utils.h": "c",
+			"led_utils.h": "c"
+		},
+		"cortex-debug.variableUseNaturalFormat": false
+	}
+}
