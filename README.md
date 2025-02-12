@@ -12,7 +12,7 @@ Current features:
 
   Dynamic Time Warping :
   
-  Work in progress, but compares two buffers to generate a "measure" of how similar they are. Originally ripped the C backend out from the DTAIDTW python library for this, but am attempting to make my own using
+  Compares two buffers to generate a "measure" of how similar they are. Originally ripped the C backend out from the DTAIDTW python library for this, but created my own Windowed Memoized DTW based off of :
   
   Abdullah Mueen, Eamonn J. Keogh: Extracting Optimal Performance from Dynamic Time Warping. KDD 2016: 2129-2130 (https://www.cs.unm.edu/~mueen/DTW.pdf)
     
