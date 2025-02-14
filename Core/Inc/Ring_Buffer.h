@@ -85,6 +85,8 @@ RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, buffer_eleme
 RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buffer_element* data);
 RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 index, buffer_element* data);
 
+RING_BUFFER_ERROR_TYPE ring_buffer_copy(ring_buffer_s* pRingBufferDst, ring_buffer_s* pRingBufferSrc);
+
 buffer_element ring_buffer_read(ring_buffer_s* pRingBuffer, u32 dim, u32 index);
 buffer_element read_buffer_wraparound(buffer_element* data, u32 start_index, u32 max_index, u32 index );
 

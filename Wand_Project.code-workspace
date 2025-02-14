@@ -27,7 +27,11 @@
 			"stdio.h": "c",
 			"static_spells.h": "c",
 			"wand_utils.h": "c",
-			"led_utils.h": "c"
+			"led_utils.h": "c",
+			"usart.h": "c",
+			"string.h": "c",
+			"stm32f4xx_hal_uart.h": "c",
+			"i2c.h": "c"
 		},
 		"cortex-debug.variableUseNaturalFormat": false
 	}

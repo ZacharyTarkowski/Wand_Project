@@ -266,14 +266,25 @@ DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t)
 
     #ifdef DTW_TIMING_ANALYSIS
     u32 startTime = HAL_GetTick();
+    u32 endTime;
     #endif
     //bad way of doing it theres some masking magic that would be better.
     u32 s_size  = s->rollover_count > 0 ? (s->dim_size)-1 : s->write_index;
     u32 t_size  = t->rollover_count > 0 ? (t->dim_size)-1 : t->write_index;
     result.x_accel_result = dtw_single_memo_with_window(      s->buffer[0],     s->write_index,        t->buffer[0],    t->write_index) ;
     result.z_accel_result = dtw_single_memo_with_window(      s->buffer[2],     s->write_index,        t->buffer[2],    t->write_index) ;
+
     uart_println("Memo");
     print_dtw_result(&result);
+
+    #ifdef DTW_TIMING_ANALYSIS
+    endTime = HAL_GetTick();
+    uart_println("DTW time : %d %d %d", endTime - startTime, s->write_index, t->write_index);
+    uart_println("DTW time : %d %d %d", endTime - startTime, s_size, t_size);
+
+    startTime = HAL_GetTick();
+    #endif
+    
     result.x_accel_result = dtw_single_memo_with_window_ring_buffer(      s,     s_size,        t,    t_size, 0) ;
     result.z_accel_result = dtw_single_memo_with_window_ring_buffer(      s,     s_size,        t,    t_size, 2) ;
     uart_println("Windowed Memo");
@@ -286,7 +297,7 @@ DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t)
     }
 
     #ifdef DTW_TIMING_ANALYSIS
-    u32 endTime = HAL_GetTick();
+    endTime = HAL_GetTick();
     uart_println("DTW time : %d %d %d", endTime - startTime, s->write_index, t->write_index);
     uart_println("DTW time : %d %d %d", endTime - startTime, s_size, t_size);
     #endif

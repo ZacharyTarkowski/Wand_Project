@@ -8,13 +8,12 @@
 #ifndef SRC_GENERAL_UTILS_H_
 #define SRC_GENERAL_UTILS_H_
 
+#include "stdio.h"
+#include "string.h"
+#include "stdarg.h"
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_hal_def.h"
 
-#include "stm32f4xx_hal_uart.h"
-#include "string.h"
-#include "stdio.h"
-#include "stdarg.h"
 
 //save place for function comment header
 /**   
@@ -24,7 +23,7 @@
 *   Return: 
 */
 
-extern UART_HandleTypeDef huart2;
+//extern UART_HandleTypeDef huart2;
 
 
 typedef enum {

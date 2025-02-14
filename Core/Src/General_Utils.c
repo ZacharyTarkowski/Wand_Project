@@ -7,6 +7,11 @@
 
 #include "General_Utils.h"
 
+//included in .c file to prevent a circular include
+#include "usart.h"
+
+
+
 /* Master Todo : General Utils
  *
  * Probably want to add some form of choose your uart object
@@ -16,8 +21,7 @@
  * Not exactly a thread safe file
  *
  */
-
-UART_HandleTypeDef huart2;
+//extern UART_HandleTypeDef huart2;
 static char msg_buf[512];
 
 const char* newlineBuffer = "\r\n";

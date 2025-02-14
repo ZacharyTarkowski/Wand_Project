@@ -513,7 +513,7 @@ void MPU6050_read_fifo_data(u32 index, Mpu_6050_data_s* data)
 	MPU6050_parse_fifo_data(&g_fifo_read_buffer[index*sizeof(Mpu_6050_data_s)], data);
 }
 
-HAL_StatusTypeDef MPU6050_reset_fifo_(Mpu_6050_handle_s* handle)
+HAL_StatusTypeDef MPU6050_reset_fifo(Mpu_6050_handle_s* handle)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 	u8 user_control;

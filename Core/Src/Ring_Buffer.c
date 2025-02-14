@@ -241,6 +241,24 @@ buffer_element read_buffer_wraparound(buffer_element* data, u32 start_index, u32
 
 }
 
+RING_BUFFER_ERROR_TYPE ring_buffer_copy(ring_buffer_s* pRingBufferDst, ring_buffer_s* pRingBufferSrc)
+{
+	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
+	
+	if(pRingBufferDst->dim_size >= pRingBufferSrc->dim_size && pRingBufferDst->num_dims >= pRingBufferSrc->num_dims)
+	{
+		for(int i = 0; i<pRingBufferSrc->num_dims; i++)
+		{
+			memcpy(pRingBufferDst->buffer[i], pRingBufferSrc->buffer[i], pRingBufferSrc->dim_size * sizeof(buffer_element));
+		}
+
+		pRingBufferDst->write_index = pRingBufferSrc->write_index;
+		status = RING_BUFFER_SUCCESS;
+	}
+	
+	return status;
+}
+
 void ring_buffer_print_all_elements(ring_buffer_s* pRingBuffer)
 {
 	for(u32 i = 0; i< pRingBuffer->dim_size; i++)
