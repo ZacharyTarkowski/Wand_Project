@@ -18,17 +18,29 @@
  */
 #include "Ring_Buffer.h"
 
-RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, buffer_element* initialData, u32 initial_data_size, u32 num_dims, u32 dim_size)
+/*
+ *  Config:
+ *  ____________________________
+ *  | 31 : 2 |      0          |
+ *  |________|_________________|
+ *  |        | rollover_enable |
+ * 	|________|_________________| 
+ * 
+**/
+
+RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, u32 ring_config, char* name, buffer_element* initialData, u32 initial_data_size, u32 num_dims, u32 dim_size)
 {
 	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
 
-	if(num_dims != 0 && dim_size != 0)
+	if(num_dims != 0 && dim_size != 0 && name != 0)
 	{
 		pRingBuffer->num_dims = num_dims;
 		pRingBuffer->dim_size = dim_size;
 		pRingBuffer->write_index = 0;
-		pRingBuffer->read_index = 0;
 		pRingBuffer->rollover_count = 0;
+		pRingBuffer->ring_config = ring_config;
+		
+		strcpy(pRingBuffer->name, name);
 
 		pRingBuffer->print_function = &MPU6050_print_data;
 		status = RING_BUFFER_SUCCESS;
@@ -82,20 +94,19 @@ RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, buffer_eleme
 }
 
 //fixme probably need this out of ring buffer source
-RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer)
+RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer, u32* num_samples)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
-	u8 num_samples = 0;
 
 	Mpu_6050_data_s tmp_data;
 
 	buffer_element tmpBuf[pRingBuffer->num_dims];
 
-	status = MPU6050_get_fifo_data(handle, &num_samples);
+	status = MPU6050_get_fifo_data(handle, num_samples);
 
 	if(status == HAL_OK)
 	{
-		for(int i = 0; i<num_samples; i++)
+		for(int i = 0; i< *num_samples; i++)
 		{
 			memset(&tmp_data,0,sizeof(Mpu_6050_data_s));
 			MPU6050_read_fifo_data(i, &tmp_data);
@@ -166,18 +177,22 @@ RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buf
 		}
 		pRingBuffer->write_index++;
 
-		//bad, read index doesnt need to exist. it is either 0 (no rollovers yet) or write_index after a rollover
-		if(pRingBuffer->rollover_count > 0)
-		{
-			pRingBuffer->read_index++;
-		}
-
+		
 		if(pRingBuffer->write_index >= pRingBuffer->dim_size)
 		{
+			if(CHECK_BIT(pRingBuffer->ring_config, ROLLOVER_ENABLE_BIT))
+			{
 			pRingBuffer->write_index = 0;
-			pRingBuffer->read_index = 0;
 			pRingBuffer->rollover_count++;
-			uart_println("ring buffer rollover");
+			#if PRINT_ROLLOVER
+				uart_println("ring buffer rollover");
+			#endif
+			}
+			else
+			{
+				uart_println("buffer overflow!");
+				return RING_BUFFER_FAIL;
+			}
 		}
 
 		status =  RING_BUFFER_SUCCESS;
@@ -206,22 +221,22 @@ RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 
 	return status;
 }
 
-buffer_element ring_buffer_read(ring_buffer_s* pRingBuffer, u32 dim, u32 index)
-{
+// buffer_element ring_buffer_read(ring_buffer_s* pRingBuffer, u32 dim, u32 index)
+// {
 
-	if(index < pRingBuffer->dim_size)
-	{
-		if(pRingBuffer->read_index + index < pRingBuffer->dim_size)
-		{
-			return pRingBuffer->buffer[dim][pRingBuffer->read_index + index];
-		}
-		else 
-		{
-			return pRingBuffer->buffer[dim][index - (pRingBuffer->dim_size - pRingBuffer->read_index)];
-		}
-	}
+// 	if(index < pRingBuffer->dim_size)
+// 	{
+// 		if(pRingBuffer->read_index + index < pRingBuffer->dim_size)
+// 		{
+// 			return pRingBuffer->buffer[dim][pRingBuffer->read_index + index];
+// 		}
+// 		else 
+// 		{
+// 			return pRingBuffer->buffer[dim][index - (pRingBuffer->dim_size - pRingBuffer->read_index)];
+// 		}
+// 	}
 
-}
+// }
 
 //not a ring buffer function, used to read an array at an index and wrap around
 //starts at an arbitray index and returns the element 
@@ -259,6 +274,48 @@ RING_BUFFER_ERROR_TYPE ring_buffer_copy(ring_buffer_s* pRingBufferDst, ring_buff
 	return status;
 }
 
+RING_BUFFER_ERROR_TYPE ring_buffer_copy_from_index(ring_buffer_s* pRingBufferDst, ring_buffer_s* pRingBufferSrc, u32 index)
+{
+	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
+	
+	if(pRingBufferDst->dim_size >= pRingBufferSrc->dim_size && pRingBufferDst->num_dims >= pRingBufferSrc->num_dims && index < pRingBufferSrc->dim_size)
+	{
+		u32 copy_len = pRingBufferSrc->write_index - index;
+		for(int i = 0; i<pRingBufferSrc->num_dims; i++)
+		{
+			memcpy(&pRingBufferDst->buffer[i][0], &pRingBufferSrc->buffer[i][index], copy_len * sizeof(buffer_element));
+		}
+
+		pRingBufferDst->write_index = copy_len;
+		status = RING_BUFFER_SUCCESS;
+	}
+	
+	return status;
+}
+
+RING_BUFFER_ERROR_TYPE ring_buffer_set_index(ring_buffer_s* pRingBuffer, u32 index)
+{
+	RING_BUFFER_ERROR_TYPE status = RING_BUFFER_FAIL;
+	
+	if(index == 0)
+	{
+		status = RING_BUFFER_SUCCESS;
+	}
+	else if(index < pRingBuffer->write_index && index < pRingBuffer->dim_size)
+	{
+		u32 copy_len = pRingBuffer->write_index - index;
+		for(int i = 0; i<pRingBuffer->num_dims; i++)
+		{
+			memmove(&pRingBuffer->buffer[i][0], &pRingBuffer->buffer[i][index], copy_len * sizeof(buffer_element));
+		}
+
+		pRingBuffer->write_index = copy_len;
+		status = RING_BUFFER_SUCCESS;
+	}
+	
+	return status;
+}
+
 void ring_buffer_print_all_elements(ring_buffer_s* pRingBuffer)
 {
 	for(u32 i = 0; i< pRingBuffer->dim_size; i++)
@@ -287,6 +344,7 @@ void ring_buffer_print_all_elements_from_read_index(ring_buffer_s* pRingBuffer)
 
 void ring_buffer_print_to_write_index(ring_buffer_s* pRingBuffer)
 {
+	uart_println(pRingBuffer->name);
 	for(u32 i = 0; i< pRingBuffer->write_index; i++)
 	{
 		for(u32 j = 0; j< pRingBuffer->num_dims; j++)

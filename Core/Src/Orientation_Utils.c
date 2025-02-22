@@ -14,8 +14,11 @@ float gyro_pitch = 0.0;
 */
 void get_accel_angles(ring_buffer_s* pRingBuffer,float* accel_pitch, float* accel_roll)
 {
-    //bad way of doing it theres some masking magic that would be better.
-    u32 index  = pRingBuffer->write_index == 0 ? pRingBuffer->dim_size-1 : pRingBuffer->write_index-1;
+    //get angle from index 0 of each buffer
+    u32 index  = CHECK_BIT(pRingBuffer->ring_config,ROLLOVER_ENABLE_BIT) ? pRingBuffer->write_index - 1 : 0; 
+
+    uart_println("%s %d %d %d",pRingBuffer->name, pRingBuffer->buffer[0][index], pRingBuffer->buffer[1][index], pRingBuffer->buffer[2][index]);
+
     float accel_x = ((float) pRingBuffer->buffer[0][index] ) / ACCEL_SCALE;
     float accel_y = ((float) pRingBuffer->buffer[1][index] ) / ACCEL_SCALE;
     float accel_z = ((float) pRingBuffer->buffer[2][index] ) / ACCEL_SCALE;
@@ -93,21 +96,25 @@ void ring_buffer_pitch_roll_rotation(ring_buffer_s* pRingBuffer, float theta, fl
     }
     else
     {
-        for(u32 i = 0; i<pRingBuffer->dim_size; i++)
-        {
-            //after a rollover, read index follows write index. the write element call is incrementing both, so just read whatevers at the write index 
-            float result_i0 = coeff_00 * ring_buffer_read(pRingBuffer,0,0) + coeff_01 * ring_buffer_read(pRingBuffer,1,0) + coeff_02 * ring_buffer_read(pRingBuffer,2,0);
-            float result_i1 = coeff_10 * ring_buffer_read(pRingBuffer,0,0) + coeff_11 * ring_buffer_read(pRingBuffer,1,0) + coeff_12 * ring_buffer_read(pRingBuffer,2,0);
-            float result_i2 = coeff_20 * ring_buffer_read(pRingBuffer,0,0) + coeff_21 * ring_buffer_read(pRingBuffer,1,0) + coeff_22 * ring_buffer_read(pRingBuffer,2,0);
-
-            buffer_element tmp_buf[pRingBuffer->num_dims];
-            tmp_buf[0] = (buffer_element)result_i0;
-            tmp_buf[1] = (buffer_element)result_i1;
-            tmp_buf[2] = (buffer_element)result_i2;
-
-            ring_buffer_write_element( pRingBuffer, tmp_buf);
-        }
+        uart_println("Cant rotate a buffer that has rolled over (don't know the start index!)");
     }
+    // else
+    // {
+    //     for(u32 i = 0; i<pRingBuffer->dim_size; i++)
+    //     {
+    //         //after a rollover, read index follows write index. the write element call is incrementing both, so just read whatevers at the write index 
+    //         float result_i0 = coeff_00 * ring_buffer_read(pRingBuffer,0,0) + coeff_01 * ring_buffer_read(pRingBuffer,1,0) + coeff_02 * ring_buffer_read(pRingBuffer,2,0);
+    //         float result_i1 = coeff_10 * ring_buffer_read(pRingBuffer,0,0) + coeff_11 * ring_buffer_read(pRingBuffer,1,0) + coeff_12 * ring_buffer_read(pRingBuffer,2,0);
+    //         float result_i2 = coeff_20 * ring_buffer_read(pRingBuffer,0,0) + coeff_21 * ring_buffer_read(pRingBuffer,1,0) + coeff_22 * ring_buffer_read(pRingBuffer,2,0);
+
+    //         buffer_element tmp_buf[pRingBuffer->num_dims];
+    //         tmp_buf[0] = (buffer_element)result_i0;
+    //         tmp_buf[1] = (buffer_element)result_i1;
+    //         tmp_buf[2] = (buffer_element)result_i2;
+
+    //         ring_buffer_write_element( pRingBuffer, tmp_buf);
+    //     }
+    // }
 
 
 }

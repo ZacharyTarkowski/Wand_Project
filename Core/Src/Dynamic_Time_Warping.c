@@ -176,7 +176,14 @@ u32 dtw_single_memo_with_window(buffer_element *s, u32 n, buffer_element *t, u32
             //don't use POW for ints! slows it way down, probably has to use the FPU
             //u32 cost = pow(s[i - 1] - t[j - 1], 2);
             s32 cost = s[i - 1] - t[j - 1]; 
+            s32 prevcost = cost;
             cost = cost * cost;
+
+            if(cost < prevcost)
+            {
+                uart_println("overflow!");
+            }
+            
             
             dtw_memo[c][j] = cost + MIN(MIN(dtw_memo[p][j], dtw_memo[c][j - 1]), dtw_memo[p][j - 1]);
         }
@@ -268,27 +275,18 @@ DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t)
     u32 startTime = HAL_GetTick();
     u32 endTime;
     #endif
-    //bad way of doing it theres some masking magic that would be better.
-    u32 s_size  = s->rollover_count > 0 ? (s->dim_size)-1 : s->write_index;
-    u32 t_size  = t->rollover_count > 0 ? (t->dim_size)-1 : t->write_index;
+
     result.x_accel_result = dtw_single_memo_with_window(      s->buffer[0],     s->write_index,        t->buffer[0],    t->write_index) ;
     result.z_accel_result = dtw_single_memo_with_window(      s->buffer[2],     s->write_index,        t->buffer[2],    t->write_index) ;
 
-    uart_println("Memo");
-    print_dtw_result(&result);
+    //uart_println("Memo");
+    //print_dtw_result(&result);
 
     #ifdef DTW_TIMING_ANALYSIS
     endTime = HAL_GetTick();
-    uart_println("DTW time : %d %d %d", endTime - startTime, s->write_index, t->write_index);
-    uart_println("DTW time : %d %d %d", endTime - startTime, s_size, t_size);
-
+    //uart_println("DTW time : %d %d %d", endTime - startTime, s->write_index, t->write_index);
     startTime = HAL_GetTick();
     #endif
-    
-    result.x_accel_result = dtw_single_memo_with_window_ring_buffer(      s,     s_size,        t,    t_size, 0) ;
-    result.z_accel_result = dtw_single_memo_with_window_ring_buffer(      s,     s_size,        t,    t_size, 2) ;
-    uart_println("Windowed Memo");
-    print_dtw_result(&result);
 
     //sqrt of 7FFFFFFF, didn't find a min cost path
     if(result.x_accel_result == 46340 || result.z_accel_result == 46340 || result.z_accel_result == INFINITY || result.z_accel_result == INFINITY)
@@ -296,13 +294,6 @@ DTW_Result DTW_Distance(ring_buffer_s* s, ring_buffer_s* t)
         uart_println("No path found, window likely must be larger");
     }
 
-    #ifdef DTW_TIMING_ANALYSIS
-    endTime = HAL_GetTick();
-    uart_println("DTW time : %d %d %d", endTime - startTime, s->write_index, t->write_index);
-    uart_println("DTW time : %d %d %d", endTime - startTime, s_size, t_size);
-    #endif
-
-    
     return result;
 }
 

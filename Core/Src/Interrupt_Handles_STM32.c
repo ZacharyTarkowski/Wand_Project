@@ -4,6 +4,7 @@ volatile u8 data_ready_flag = 0;
 volatile u8 capture_flag = 0;
 volatile u32 capture_flag_valid_time;
 volatile u8 timer_flag = 0;
+volatile u8 finished_all_dtw_comparisons = 0;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {

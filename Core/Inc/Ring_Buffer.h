@@ -31,11 +31,17 @@ Fix is to do own DTW or fix dtai dtw
 //#define RING_BUFFER_ERROR_TYPE HAL_StatusTypeDef
 #define buffer_element int32_t
 
+#define PRINT_ROLLOVER 1
+
 #if 0
 #define ringBufPrint ("%f.2, ")
 #else
 #define ringBufPrint ("%d, ")
 #endif
+
+#define ROLLOVER_ENABLE_BIT 0
+#define RESERVED_BIT 1
+#define RESERVED_BIT 31
 
 typedef enum 
 {
@@ -61,10 +67,11 @@ typedef struct ring_buffer_s
 {
     buffer_element** buffer;
     u32 write_index;
-    u32 read_index;
     u32 num_dims;
     u32 dim_size;
     u32 rollover_count;
+    u32 ring_config;
+    char name[20];
     void (*print_function)(buffer_element* pData);
 } ring_buffer_s;
 
@@ -80,12 +87,14 @@ typedef struct ring_buffer_s
 static void (*ring_buffer_print_function)(buffer_element* pData);
 
 
-RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, buffer_element* initialData, u32 initial_data_size, u32 num_dims, u32 dim_size);
+RING_BUFFER_ERROR_TYPE ring_buffer_init(ring_buffer_s* pRingBuffer, u32 ring_config, char* name, buffer_element* initialData, u32 initial_data_size, u32 num_dims, u32 dim_size);
 
 RING_BUFFER_ERROR_TYPE ring_buffer_write_element(ring_buffer_s* pRingBuffer, buffer_element* data);
 RING_BUFFER_ERROR_TYPE ring_buffer_read_element(ring_buffer_s* pRingBuffer, u32 index, buffer_element* data);
 
 RING_BUFFER_ERROR_TYPE ring_buffer_copy(ring_buffer_s* pRingBufferDst, ring_buffer_s* pRingBufferSrc);
+RING_BUFFER_ERROR_TYPE ring_buffer_copy_from_index(ring_buffer_s* pRingBufferDst, ring_buffer_s* pRingBufferSrc, u32 index);
+RING_BUFFER_ERROR_TYPE ring_buffer_set_index(ring_buffer_s* pRingBuffer, u32 index);
 
 buffer_element ring_buffer_read(ring_buffer_s* pRingBuffer, u32 dim, u32 index);
 buffer_element read_buffer_wraparound(buffer_element* data, u32 start_index, u32 max_index, u32 index );
@@ -98,7 +107,7 @@ void ring_buffer_print_all_elements_from_read_index(ring_buffer_s* pRingBuffer);
 void ring_buffer_clear(ring_buffer_s* pRingBuffer);
 
 //todo fix this?
-RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer);
+RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_read_and_store(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer, u32* num_samples);
 RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_get_accel_sample(Mpu_6050_handle_s* handle, ring_buffer_s* pRingBuffer);
 
 RING_BUFFER_ERROR_TYPE ring_buffer_MPU6050_parse_data_buffer(ring_buffer_s* pRingBuffer, s16* data);

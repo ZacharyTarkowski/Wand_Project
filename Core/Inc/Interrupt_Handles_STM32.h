@@ -7,6 +7,7 @@ extern volatile u8 data_ready_flag;
 extern volatile u8 capture_flag;
 extern volatile u32 capture_flag_valid_time;
 extern volatile u8 timer_flag;
+extern volatile u8 finished_all_dtw_comparisons;
 
 extern TIM_HandleTypeDef htim3;
 

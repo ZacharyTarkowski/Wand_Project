@@ -15,7 +15,7 @@
 //0xFFFFFFFF causes problems for signed addition and 0x7FFFFFFF is sufficiently high enough for this data anyway
 #define INFINITY 0x7FFFFFFF
 
-//#define DTW_WINDOW_MANUAL 75
+#define DTW_WINDOW_MANUAL 90
 
 #ifdef DTW_WINDOW_MANUAL
     #define DTW_WINDOW DTW_WINDOW_MANUAL

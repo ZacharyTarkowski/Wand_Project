@@ -48,24 +48,30 @@
 
 /* USER CODE BEGIN PV */
 
+#define DEBUG_STATE_DEF 0
+
 Mpu_6050_handle_s MPU6050_handle;
 Mpu_6050_handle_s* pMPU6050 = &MPU6050_handle;
 
 HAL_StatusTypeDef wand_init()
 {
-  u8 sample_rate_divider = 10;
+  //30hz (1024/33)
+  u8 sample_rate_divider = 33;
 
+  u32 default_ring_config = 0x0;
 
   HAL_StatusTypeDef status = HAL_ERROR;
 	status = MPU6050_init(pMPU6050, &hi2c1, 0x68, sample_rate_divider, 0x30, 0x40, 0x06 );
-  status |= ring_buffer_init(&ring_buffer_capture_1, ring_1_initial_data, sizeof(ring_1_initial_data), MPU_6050_NUM_DIMS,  SPELL_SIZE);
-	status |= ring_buffer_init(&ring_buffer_capture_2, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS, SPELL_SIZE);
-  status |= ring_buffer_init(&ring_buffer_capture_3, 0, 0, MPU_6050_NUM_DIMS, SPELL_SIZE);
+  
+  status |= ring_buffer_init(&ring_buffer_capture_1, default_ring_config, "Capture 1", 0, 0, MPU_6050_NUM_DIMS, SPELL_SIZE + SPELL_COMPARISON_TICK_SIZE + 10);
+	status |= ring_buffer_init(&ring_buffer_capture_2, default_ring_config, "Capture 2", 0, 0, MPU_6050_NUM_DIMS, SPELL_SIZE + SPELL_COMPARISON_TICK_SIZE + 10);
+  status |= ring_buffer_init(&ring_buffer_capture_3, default_ring_config, "Capture 3", 0, 0, MPU_6050_NUM_DIMS, SPELL_SIZE);
 
-  status |= ring_buffer_init(&ring_buffer_spell_1, ring_1_initial_data, sizeof(ring_1_initial_data), MPU_6050_NUM_DIMS,  SPELL_SIZE );
-	status |= ring_buffer_init(&ring_buffer_spell_2, ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS, SPELL_SIZE );
+  status |= ring_buffer_init(&ring_buffer_spell_1, default_ring_config, "Spell 1", ring_1_initial_data, sizeof(ring_1_initial_data), MPU_6050_NUM_DIMS,  SPELL_SIZE );
+	status |= ring_buffer_init(&ring_buffer_spell_2, default_ring_config, "Spell 2", ring_2_initial_data, sizeof(ring_2_initial_data), MPU_6050_NUM_DIMS, SPELL_SIZE );
+  status |= ring_buffer_init(&ring_buffer_spell_3, default_ring_config, "Spell 3", ring_3_initial_data, sizeof(ring_3_initial_data), MPU_6050_NUM_DIMS, SPELL_SIZE + 20);
 
-  status |= ring_buffer_init(&ring_buffer_idle, 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
+  status |= ring_buffer_init(&ring_buffer_idle, default_ring_config, "Idle", 0, 0, MPU_6050_NUM_DIMS,  RING_BUFFER_MAX_SIZE);
   
 	status |= dtw_init();
 
@@ -79,6 +85,11 @@ HAL_StatusTypeDef wand_init()
 
   return status;
 }
+
+#define ADVANCE_STATE(next_state) last_state = state; state = next_state; 
+
+//this also does IDLE->CAPTURE_2
+#define BUFFER_SWAP(last_state) current_buffer = (last_state == CAPTURE_2) ? &ring_buffer_capture_1 : &ring_buffer_capture_2;
 
 /* USER CODE END PV */
 
@@ -133,6 +144,8 @@ int main(void)
   DTW_Result result;
   WAND_STATE state = IDLE;
   WAND_STATE next_state = CAPTURE_1;
+  WAND_STATE last_state = INIT;
+  ring_buffer_s* current_buffer;
 	
 	status = wand_init();
 
@@ -151,13 +164,16 @@ int main(void)
   volatile float pitch_accel_deg = 0; volatile float roll_accel_deg  = 0;
 
   u32 num_samples = 0;
+  u32 last_capture_num_samples = 0;
   u32 sample_window_start = 0;
   u8 first_run = 1;
   u8 MPU6050_hard_reset_flag = 0;
 
-  state = ROLLING_COMPARE;
-  //state = IDLE;
-  //state = DEBUG_STATE;
+  state = INIT;
+  #if DEBUG_STATE_DEF
+    state = DEBUG_STATE;
+  #endif
+  //state = GET_SPELL;
 
   MPU6050_reset_fifo(pMPU6050);
 
@@ -169,35 +185,37 @@ int main(void)
 
 		switch(state)
 		{
+      case INIT:
+        current_buffer = &ring_buffer_capture_1;
+
+        if(data_ready_flag && status != HAL_ERROR)
+				{
+					data_ready_flag = 0;
+					status = ring_buffer_MPU6050_get_accel_sample(pMPU6050,  current_buffer);
+				}
+
+        if(current_buffer->write_index > SPELL_SIZE)
+        {
+          MPU6050_reset_fifo(pMPU6050);
+          //ADVANCE_STATE(ROLLING_COMPARE);
+          ADVANCE_STATE(CAPTURE_1);
+        }
+
+      break;
+
 			case IDLE:
-			if(capture_flag)
-			{
-				first_run = 1;
-				state = next_state;
-			}
-      else if(timer_flag)
+
+      if(timer_flag)
 			{
 				timer_flag = 0;
-				if(first_run)
-				{
-					first_run = 0;
-					
-          //dont want to clear anymore, for movement detection
-					//ring_buffer_clear(&ring_buffer_idle);
-					status = ring_buffer_MPU6050_get_accel_sample(pMPU6050, &ring_buffer_idle);
-					data_ready_flag = 0;
-				}
 
-				if(data_ready_flag && status != HAL_ERROR)
-				{
-					data_ready_flag = 0;
+        if(finished_all_dtw_comparisons != 1)
+        {
+          uart_println("DTW did not finish in time!");
+          state = HARD_RESET;
+        }
 
-					status = ring_buffer_MPU6050_get_accel_sample(pMPU6050, &ring_buffer_idle);
-
-          //constantly doing angle calcs, dont need to do it that way...
-          get_accel_angles(&ring_buffer_idle,&pitch_accel,&roll_accel);
-          //uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
-				}
+        ADVANCE_STATE(CAPTURE_1);
 			}
 
 			break;
@@ -205,84 +223,44 @@ int main(void)
 			case CAPTURE_1:
 			case CAPTURE_2:
 
-			if(capture_flag)
-			{
-				if(first_run)
-				{
-					uart_println("Capturing %d",state);
-					first_run = 0;
-          ring_buffer_clear(state==CAPTURE_1 ? &ring_buffer_capture_1 : &ring_buffer_capture_2);
+        ring_buffer_set_index(current_buffer, last_capture_num_samples);
 
-          if(state == CAPTURE_1)
-          {
-            pitch_accel_1 = pitch_accel;
-            roll_accel_1 = roll_accel;
-            next_state = CAPTURE_2;
-          }
-          else if (state == CAPTURE_2)
-          {
-            pitch_accel_2 = pitch_accel;
-            roll_accel_2 = roll_accel;
-            next_state = PRINT_AND_COMPARE;
-          }
-				}
-
-				if(data_ready_flag && status != HAL_ERROR)
-				{
-					data_ready_flag = 0;
-					status = ring_buffer_MPU6050_get_accel_sample(pMPU6050, ( state==CAPTURE_1 ? &ring_buffer_capture_1 : &ring_buffer_capture_2 ) );
-				}
-			}
-			
-			if(!capture_flag)
-			{
-				if( !first_run )
-				{
-					uart_println("Done Capturing %d",state);
-          state = IDLE;
-					first_run = 1;
-				}
-			}
-			break;
+        if(data_ready_flag && status != HAL_ERROR)
+        {
+          data_ready_flag = 0;
+          status = ring_buffer_MPU6050_read_and_store(pMPU6050,  current_buffer, &last_capture_num_samples);
+        }
+        ADVANCE_STATE(ROLLING_COMPARE);
+      break;
 
       case ROLLING_COMPARE:
 
-        if(data_ready_flag && !MPU6050_hard_reset_flag)
-        {
-          data_ready_flag = 0;
+          uart_println("%s last capture %d",current_buffer->name, last_capture_num_samples);
+          get_accel_angles(current_buffer, &pitch_accel,&roll_accel);
+          //uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
 
-					  status = ring_buffer_MPU6050_read_and_store(pMPU6050,  &ring_buffer_capture_3  );
+          ring_buffer_copy(&ring_buffer_capture_2, current_buffer);
+          ring_buffer_pitch_roll_rotation(&ring_buffer_capture_2, pitch_accel, roll_accel);
 
-          //num_samples++;
-          num_samples+=1;
-        }
+          //uart_println("Comparison to %s",spell_name_1);
+          result = DTW_Distance(&ring_buffer_capture_2, &ring_buffer_spell_1);
+          uart_println("Spell 1 %d %d", result.x_accel_result, result.z_accel_result);
+          if(result.x_accel_result < 10000 && result.z_accel_result < 10000)
+          {
+            uart_println("live match");
+            uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
+            ring_buffer_print_to_write_index(&ring_buffer_capture_2);
+          }
 
-        //remember the first (spellsize / window) are essentially worthless
-        if(num_samples >= DTW_WINDOW && ring_buffer_capture_3.rollover_count > 0)
-        {
-          //get acceleration for the beginning of the calc, not like this
-          //get_accel_angles(&ring_buffer_capture_3,&pitch_accel,&roll_accel);
-          uart_println("Before");
-          //ring_buffer_print_all_elements_from_read_index(&ring_buffer_capture_3);
-          result = DTW_Distance(&ring_buffer_capture_3, &ring_buffer_spell_2);
+          result = DTW_Distance(&ring_buffer_capture_2, &ring_buffer_spell_2);
+          uart_println("Spell 2 %d %d", result.x_accel_result, result.z_accel_result);
 
-          get_accel_angles(&ring_buffer_capture_3,&pitch_accel,&roll_accel);
-          uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
-          ring_buffer_pitch_roll_rotation(&ring_buffer_capture_3, pitch_accel, roll_accel);
+          //TEMP TEMP TEMP FOR TIMING
+          //MPU6050_reset_fifo(pMPU6050);
+          HAL_Delay(150);
 
-          
-          
-          uart_println("Comparison to %s",spell_name_2);
-          //ring_buffer_print_all_elements_from_read_index(&ring_buffer_capture_3);
-          
-          result = DTW_Distance(&ring_buffer_capture_3, &ring_buffer_spell_2);
-          //print_dtw_result(&result);
 
-          sample_window_start += DTW_WINDOW;
-          if(sample_window_start >= SPELL_SIZE) {sample_window_start -= SPELL_SIZE; }
-
-          num_samples = 0;
-        }
+          ADVANCE_STATE(CAPTURE_1);
 
       break;
 
@@ -362,6 +340,11 @@ int main(void)
 
       case DEBUG_STATE:
 
+
+        ring_buffer_print_to_write_index(&ring_buffer_spell_3);
+        result = DTW_Distance(&ring_buffer_spell_1, &ring_buffer_spell_3);
+				print_dtw_result(&result);
+
         result = DTW_Distance(&ring_buffer_spell_1, &ring_buffer_spell_2);
 				print_dtw_result(&result);
 
@@ -369,10 +352,10 @@ int main(void)
         u32 endTime;
         for(int i = 0; i<200; i++)
         {
-          memcpy(ring_buffer_spell_1.buffer[0],ring_buffer_spell_1.buffer[3],ring_buffer_spell_1.write_index*sizeof(buffer_element));
+          //memcpy(ring_buffer_spell_1.buffer[0],ring_buffer_spell_1.buffer[3],ring_buffer_spell_1.write_index*sizeof(buffer_element));
         }
         endTime = HAL_GetTick();
-        uart_println("Memcpy time : %d Size : %d", endTime - startTime,ring_buffer_spell_1.write_index);
+        uart_println("Memcpy (200) time : %d Size : %d", endTime - startTime,ring_buffer_spell_1.write_index);
         
         startTime = HAL_GetTick();
         u32 n = 15;
@@ -384,22 +367,61 @@ int main(void)
         uart_println("%d Samples : %d ms",n, endTime - startTime);
 
         ring_buffer_print_to_write_index(&ring_buffer_capture_3);
+        ring_buffer_print_to_write_index(&ring_buffer_spell_1);
         startTime = HAL_GetTick();
         ring_buffer_copy(&ring_buffer_capture_3,&ring_buffer_spell_1);
         endTime = HAL_GetTick();
         uart_println("Ringbuffcpy time : %d Size : %d x %d", endTime - startTime,ring_buffer_spell_1.dim_size,ring_buffer_spell_1.num_dims);
 
-        //ring_buffer_print_to_write_index(&ring_buffer_capture_3);
+        startTime = HAL_GetTick();
+        ring_buffer_set_index(&ring_buffer_capture_3,15);
+        endTime = HAL_GetTick();
+        ring_buffer_print_to_write_index(&ring_buffer_capture_3);
+        uart_println("Setindex time : %d Size : %d x %d", endTime - startTime);
+        
+
+        ring_buffer_print_to_write_index(&ring_buffer_capture_3);
         startTime = HAL_GetTick();
         status = MPU6050_get_fifo_data(pMPU6050, &num_samples);
-        ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_capture_3);
+        ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_capture_3, &last_capture_num_samples);
         endTime = HAL_GetTick();
         uart_println("%d Samples : %d ms",num_samples, endTime - startTime);
 
         //this should wait for an entire button press cycle
-        while(!capture_flag){};
+        while(!capture_flag){
+            // startTime = HAL_GetTick();
+            // status = MPU6050_get_fifo_data(pMPU6050, &num_samples);
+            // ring_buffer_MPU6050_read_and_store(pMPU6050, &ring_buffer_capture_3);
+            // endTime = HAL_GetTick();
+            // uart_println("%d Samples : %d ms",num_samples, endTime - startTime);
+            // HAL_Delay(1000);
+          };
         while(capture_flag){};
 
+      break;
+        
+      case GET_SPELL:
+        if(capture_flag)
+        {
+          current_buffer = &ring_buffer_capture_1;
+          ring_buffer_clear(current_buffer);
+          while(current_buffer->write_index < SPELL_SIZE)
+          {
+            if(data_ready_flag && status != HAL_ERROR)
+            {
+              data_ready_flag = 0;
+              status = ring_buffer_MPU6050_get_accel_sample(pMPU6050,  current_buffer);
+            }
+          }
+
+          get_accel_angles(current_buffer, &pitch_accel,&roll_accel);
+          uart_println("Angle estimates : Pitch %f, Roll %f", pitch_accel, roll_accel);
+
+          ring_buffer_pitch_roll_rotation(current_buffer, pitch_accel, roll_accel);
+
+          ring_buffer_print_to_write_index(current_buffer);
+        }
+        while(capture_flag){};
       break;
 
 			case HARD_RESET:

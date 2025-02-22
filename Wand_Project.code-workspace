@@ -31,7 +31,9 @@
 			"usart.h": "c",
 			"string.h": "c",
 			"stm32f4xx_hal_uart.h": "c",
-			"i2c.h": "c"
+			"i2c.h": "c",
+			"tim.h": "c",
+			"interrupt_handles_stm32.h": "c"
 		},
 		"cortex-debug.variableUseNaturalFormat": false
 	}

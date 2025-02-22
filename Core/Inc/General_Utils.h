@@ -26,6 +26,9 @@
 //extern UART_HandleTypeDef huart2;
 
 
+//returns 1 or 0 based on bit value
+#define CHECK_BIT(reg,bit) ( ( reg & (1<<bit) ) >> bit )
+
 typedef enum {
     ADD,
     SUB,

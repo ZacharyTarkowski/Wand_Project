@@ -304,7 +304,7 @@ HAL_StatusTypeDef MPU6050_init(Mpu_6050_handle_s* handle, I2C_HandleTypeDef* i2c
 
 
 
-HAL_StatusTypeDef MPU6050_get_fifo_data(Mpu_6050_handle_s* handle, u8* num_samples)
+HAL_StatusTypeDef MPU6050_get_fifo_data(Mpu_6050_handle_s* handle, u32* num_samples)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 	u8 fifo_count[2] = {0};
